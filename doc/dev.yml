@@ -1,0 +1,4 @@
+  - 'Webhooks: HTTP events from KAZOO to you':
+    - 'applications/webhooks/doc/README.md'
+    - 'applications/webhooks/doc/disabler.md'
+    - 'applications/webhooks/doc/maintenance.md'
