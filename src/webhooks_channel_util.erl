@@ -22,21 +22,10 @@
 -spec handle_event(kz_call_event:doc(), kz_term:proplist()) -> 'ok'.
 handle_event(CallEvent, _Props) ->
     HookEvent = hook_event_name(kz_api:event_name(CallEvent)),
-    case kz_hooks_util:lookup_account_id(CallEvent) of
-        {'error', _R} ->
-            lager:debug("failed to determine account id for ~s", [HookEvent]);
-        {'ok', AccountId} ->
-            CallEvent1 = kz_json:set_value([<<"Custom-Channel-Vars">>
-                                           ,<<"Account-ID">>
-                                           ]
-                                          ,AccountId
-                                          ,CallEvent
-                                          ),
-            maybe_handle_channel_event(AccountId, HookEvent, CallEvent1)
-    end.
+    maybe_handle_channel_event(kz_call_event:account_id(CallEvent), HookEvent, CallEvent).
 
 -spec maybe_handle_channel_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:doc()) -> 'ok'.
-maybe_handle_channel_event(AccountId, HookEvent, CallEvent) ->
+maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent) ->
     lager:debug("evt ~s for ~s", [HookEvent, AccountId]),
     case webhooks_util:find_webhooks(HookEvent, AccountId) of
         [] -> lager:debug("no hooks to handle ~s for ~s", [HookEvent, AccountId]);
