@@ -30,7 +30,7 @@
 init() ->
     webhooks_util:init_metadata(?ID, ?METADATA).
 
--spec bindings_and_responders() -> {gen_listener:bindings(), gen_listener:responders()}.
+-spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responders()}.
 bindings_and_responders() ->
     {bindings(), responders()}.
 
@@ -38,7 +38,7 @@ bindings_and_responders() ->
 bindings() ->
     [{'call', [{'restrict_to', ['CHANNEL_ANSWER']}]}].
 
--spec responders() -> gen_listener:responders().
+-spec responders() -> listener_utils:responders().
 responders() ->
     [{{'webhooks_channel_util', 'handle_event'}
      ,[{<<"call_event">>, <<"CHANNEL_ANSWER">>}]

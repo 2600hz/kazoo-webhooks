@@ -77,7 +77,7 @@ start_link() ->
                            ).
 
 -type load_acc() :: {gen_listener:bindings()
-                    ,gen_listener:responders()
+                    ,listener_utils:responders()
                     }.
 
 -spec load_module_bindings_and_responders() -> load_acc().
