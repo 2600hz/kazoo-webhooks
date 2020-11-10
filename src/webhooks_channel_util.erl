@@ -19,12 +19,12 @@
 
 -include("webhooks.hrl").
 
--spec handle_event(kz_call_event:doc(), kz_term:proplist()) -> 'ok'.
+-spec handle_event(kz_call_event:payload(), kz_term:proplist()) -> 'ok'.
 handle_event(CallEvent, _Props) ->
     HookEvent = hook_event_name(kz_api:event_name(CallEvent)),
     maybe_handle_channel_event(kz_call_event:account_id(CallEvent), HookEvent, CallEvent).
 
--spec maybe_handle_channel_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:doc()) -> 'ok'.
+-spec maybe_handle_channel_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:payload()) -> 'ok'.
 maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent) ->
     lager:debug("evt ~s for ~s", [HookEvent, AccountId]),
     case webhooks_util:find_webhooks(HookEvent, AccountId) of
@@ -33,18 +33,18 @@ maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent
             maybe_fire_event(AccountId, HookEvent, CallEvent, Hooks)
     end.
 
--spec maybe_fire_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:doc(), webhooks()) -> 'ok'.
+-spec maybe_fire_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:payload(), webhooks()) -> 'ok'.
 maybe_fire_event(AccountId, HookEvent, CallEvent, Hooks) ->
     FireAbleHooks = fireable_hooks(CallEvent, Hooks),
     webhooks_util:fire_hooks(format_event(CallEvent, AccountId, HookEvent), FireAbleHooks).
 
--spec fireable_hooks(kz_call_event:doc(), webhooks()) -> webhooks().
+-spec fireable_hooks(kz_call_event:payload(), webhooks()) -> webhooks().
 fireable_hooks(CallEvent, Hooks) ->
     [Hook || #webhook{}=Hook <- Hooks,
              is_fireable_hook(CallEvent, Hook)
     ].
 
--spec is_fireable_hook(kz_call_event:doc(), webhook()) -> boolean().
+-spec is_fireable_hook(kz_call_event:payload(), webhook()) -> boolean().
 is_fireable_hook(_CallEvent, #webhook{include_loopback='true'}) -> 'true';
 is_fireable_hook(CallEvent, #webhook{include_loopback='false'
                                     ,id=_Id
@@ -66,7 +66,7 @@ is_loopback_channel_name(_N) -> 'false'.
 hook_event_name(<<"CHANNEL_DISCONNECTED">>) -> <<"CHANNEL_DESTROY">>;
 hook_event_name(Event) -> Event.
 
--spec format_event(kz_call_event:doc(), kz_term:api_binary(), kz_term:ne_binary()) ->
+-spec format_event(kz_call_event:payload(), kz_term:api_binary(), kz_term:ne_binary()) ->
           kz_json:object().
 format_event(CallEvent, AccountId, <<"CHANNEL_CREATE">>) ->
     kz_json:set_value(<<"hook_event">>
@@ -98,11 +98,11 @@ format_event(CallEvent, AccountId, <<"CHANNEL_DESTROY">>) ->
                     ]
                    ).
 
--spec base_hook_event(kz_call_event:doc(), kz_term:api_binary()) -> kz_json:object().
+-spec base_hook_event(kz_call_event:payload(), kz_term:api_binary()) -> kz_json:object().
 base_hook_event(CallEvent, AccountId) ->
     base_hook_event(CallEvent, AccountId, []).
 
--spec base_hook_event(kz_call_event:doc(), kz_term:api_binary(), kz_term:proplist()) -> kz_json:object().
+-spec base_hook_event(kz_call_event:payload(), kz_term:api_binary(), kz_term:proplist()) -> kz_json:object().
 base_hook_event(CallEvent, AccountId, Acc) ->
     WasGlobal = kz_term:is_true(ccv(CallEvent, <<"Global-Resource">>)),
 
@@ -134,21 +134,21 @@ base_hook_event(CallEvent, AccountId, Acc) ->
       | Acc
       ]).
 
--spec resource_used(boolean(), kz_call_event:doc()) -> kz_term:api_binary().
+-spec resource_used(boolean(), kz_call_event:payload()) -> kz_term:api_binary().
 resource_used('true', _CallEvent) -> 'undefined';
 resource_used('false', CallEvent) -> ccv(CallEvent, <<"Resource-ID">>).
 
--spec ccv(kz_call_event:doc(), kz_json:key()) ->
+-spec ccv(kz_call_event:payload(), kz_json:key()) ->
           kz_term:api_ne_binary().
 ccv(CallEvent, Key) ->
     ccv(CallEvent, Key, 'undefined').
 
--spec ccv(kz_call_event:doc(), kz_json:key(), Default) ->
+-spec ccv(kz_call_event:payload(), kz_json:key(), Default) ->
           kz_term:ne_binary() | Default.
 ccv(CallEvent, Key, Default) ->
     kz_call_event:custom_channel_var(CallEvent, Key, Default).
 
--spec non_reserved_ccvs(kz_call_event:doc()) -> kz_term:api_object().
+-spec non_reserved_ccvs(kz_call_event:payload()) -> kz_term:api_object().
 non_reserved_ccvs(CallEvent) ->
     CCVs = kz_call_event:custom_channel_vars(CallEvent, kz_json:new()),
     non_reserved_ccvs(CCVs, kapps_config:get_ne_binaries(<<"call_command">>, <<"reserved_ccv_keys">>)).
@@ -158,5 +158,5 @@ non_reserved_ccvs(_CCVs, 'undefined') -> 'undefined';
 non_reserved_ccvs(CCVs, Keys) ->
     kz_json:filter(fun({K, _}) -> not lists:member(K, Keys) end, CCVs).
 
--spec cavs(kz_call_event:doc()) -> kz_term:api_object().
+-spec cavs(kz_call_event:payload()) -> kz_term:api_object().
 cavs(CallEvent) -> kz_call_event:custom_application_vars(CallEvent).
