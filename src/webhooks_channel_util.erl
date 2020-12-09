@@ -18,13 +18,21 @@
 -endif.
 
 -include("webhooks.hrl").
+-include_lib("kazoo_stdlib/include/kz_databases.hrl").
 
 -spec handle_event(kz_call_event:payload(), kz_term:proplist()) -> 'ok'.
 handle_event(CallEvent, _Props) ->
     HookEvent = hook_event_name(kz_api:event_name(CallEvent)),
     maybe_handle_channel_event(kz_call_event:account_id(CallEvent), HookEvent, CallEvent).
 
--spec maybe_handle_channel_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:payload()) -> 'ok'.
+-spec maybe_handle_channel_event(kz_term:api_ne_binary(), kz_term:ne_binary(), kz_call_event:payload()) -> 'ok'.
+maybe_handle_channel_event('undefined', HookEvent, CallEvent) ->
+    case find_account_in_event(CallEvent) of
+        'undefined' ->
+            lager:debug("no account identifiable in event ~p", [CallEvent]);
+        <<AccountId/binary>> ->
+            maybe_handle_channel_event(AccountId, HookEvent, CallEvent)
+    end;
 maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent) ->
     lager:debug("evt ~s for ~s", [HookEvent, AccountId]),
     case webhooks_util:find_webhooks(HookEvent, AccountId) of
@@ -160,3 +168,44 @@ non_reserved_ccvs(CCVs, Keys) ->
 
 -spec cavs(kz_call_event:payload()) -> kz_term:api_object().
 cavs(CallEvent) -> kz_call_event:custom_application_vars(CallEvent).
+
+-spec find_account_in_event(kz_call_event:doc()) -> kz_term:api_ne_binary().
+find_account_in_event(CallEvent) ->
+    Finders = [{fun account_id_from_sip_uri/1
+               ,kz_json:get_ne_binary_value(<<"Request">>, CallEvent)
+               }
+              ,{fun account_id_from_sip_uri/1
+               ,kz_json:get_ne_binary_value(<<"To">>, CallEvent)
+               }
+              ],
+    find_account(Finders).
+
+-spec find_account([{fun(), kz_term:api_ne_binary()}]) -> kz_term:api_ne_binary().
+find_account([]) -> 'undefined';
+find_account([{FinderFun, FinderValue} | Finders]) ->
+    case FinderFun(FinderValue) of
+        'undefined' -> find_account(Finders);
+        AccountId -> AccountId
+    end.
+
+-spec account_id_from_sip_uri(kz_term:api_ne_binary()) -> kz_term:api_ne_binary().
+account_id_from_sip_uri('undefined') -> 'undefined';
+account_id_from_sip_uri(Request) ->
+    case ersip_uri:parse(<<"sip:", Request/binary>>) of
+        {'error', _} -> 'undefined';
+        {'ok', URI} ->
+            account_id_from_sip_realm(ersip_uri:host(URI))
+    end.
+
+-spec account_id_from_sip_realm(ersip_host:host() | kz_term:ne_binary()) -> kz_term:api_ne_binary().
+account_id_from_sip_realm({'hostname', Realm}) ->
+    account_id_from_sip_realm(Realm);
+account_id_from_sip_realm(<<Realm/binary>>) ->
+    ViewOptions = [{'key', kz_term:to_lower_binary(Realm)}],
+    case kz_datamgr:get_results(?KZ_ACCOUNTS_DB, <<"accounts/listing_by_realm">>, ViewOptions) of
+        {'ok', [ViewResult]} ->
+            lager:debug("found account id by realm: ~s", [Realm]),
+            kz_doc:id(ViewResult);
+        _ -> 'undefined'
+    end;
+account_id_from_sip_realm(_Realm) -> 'undefined'.
