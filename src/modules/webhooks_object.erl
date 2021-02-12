@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -102,7 +102,15 @@ account_bindings(_AccountId) -> [].
 -spec handle_event(kapi_conf:doc(), kz_term:proplist()) -> 'ok'.
 handle_event(DocChange, _Props) ->
     kz_log:put_callid(DocChange),
-    'true' = kapi_conf:doc_update_v(DocChange),
+
+    EventName = kz_api:event_name(DocChange),
+
+    case kapi_definition:name(kapi_conf:api_definition(<<"doc_type_update">>)) of
+        EventName ->
+            'true' = kapi_conf:doc_type_update_v(DocChange);
+        _ ->
+            'true' = kapi_conf:doc_update_v(DocChange)
+    end,
 
     case find_account_id(DocChange) of
         'undefined' -> 'ok';
