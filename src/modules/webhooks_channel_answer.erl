@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -30,7 +30,7 @@
 init() ->
     webhooks_util:init_metadata(?ID, ?METADATA).
 
--spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responders()}.
+-spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responder_start_params()}.
 bindings_and_responders() ->
     {bindings(), responders()}.
 
@@ -38,7 +38,7 @@ bindings_and_responders() ->
 bindings() ->
     [{'call', [{'restrict_to', ['CHANNEL_ANSWER']}]}].
 
--spec responders() -> listener_utils:responders().
+-spec responders() -> listener_utils:responder_start_params().
 responders() ->
     [{{'webhooks_channel_util', 'handle_event'}
      ,[{<<"call_event">>, <<"CHANNEL_ANSWER">>}]

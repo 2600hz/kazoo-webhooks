@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -32,7 +32,7 @@
 init() ->
     webhooks_util:init_metadata(?ID, ?METADATA).
 
--spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responders()}.
+-spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responder_start_params()}.
 bindings_and_responders() ->
     {[{'self', []}]
     ,[{{?MODULE, 'handle_event'}

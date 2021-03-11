@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -70,7 +70,7 @@ init([EventDefinition|Rest], Acc) ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responders()}.
+-spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responder_start_params()}.
 bindings_and_responders() ->
     {bindings(), responders()}.
 
@@ -85,7 +85,7 @@ bindings() ->
      }
     ].
 
--spec responders() -> listener_utils:responders().
+-spec responders() -> listener_utils:responder_start_params().
 responders() ->
     [{{?MODULE, 'handle_event'}
      ,[{<<"notification">>, <<"*">>}]

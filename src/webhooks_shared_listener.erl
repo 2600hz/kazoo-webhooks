@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc
 %%% @author SIPLABS LLC (Maksim Krzhemenevskiy)
 %%%
@@ -77,7 +77,7 @@ start_link() ->
                            ).
 
 -type load_acc() :: {gen_listener:bindings()
-                    ,listener_utils:responders()
+                    ,listener_utils:responder_start_params()
                     }.
 
 -spec load_module_bindings_and_responders() -> load_acc().

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%%
 %%%
 %%% @author Peter Defebvre
@@ -42,7 +42,7 @@ init() ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responders()}.
+-spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responder_start_params()}.
 bindings_and_responders() ->
     {[{'call', [{'restrict_to', ['PARK_PARKED', 'PARK_RETRIEVED', 'PARK_ABANDONED']}
                ]

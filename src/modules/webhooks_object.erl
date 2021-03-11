@@ -77,11 +77,11 @@ init() ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responders()}.
+-spec bindings_and_responders() -> {gen_listener:bindings(), listener_utils:responder_start_params()}.
 bindings_and_responders() ->
     {bindings(), responders()}.
 
--spec responders() -> listener_utils:responders().
+-spec responders() -> listener_utils:responder_start_params().
 responders() ->
     [{{?MODULE, 'handle_event'}
      ,[{<<"configuration">>, <<"*">>}]
