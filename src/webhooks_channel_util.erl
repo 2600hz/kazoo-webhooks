@@ -169,7 +169,7 @@ non_reserved_ccvs(CCVs, Keys) ->
 -spec cavs(kz_call_event:payload()) -> kz_term:api_object().
 cavs(CallEvent) -> kz_call_event:custom_application_vars(CallEvent).
 
--spec find_account_in_event(kz_call_event:doc()) -> kz_term:api_ne_binary().
+-spec find_account_in_event(kz_call_event:payload()) -> kz_term:api_ne_binary().
 find_account_in_event(CallEvent) ->
     Finders = [{fun account_id_from_sip_uri/1
                ,kz_json:get_ne_binary_value(<<"Request">>, CallEvent)
