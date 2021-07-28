@@ -39,3 +39,17 @@ To restrict the kind of document or the action or both, you can set the custom d
     "type": "user"
 }
 ```
+
+## Include document data
+
+It is possible to include data from the document on the webhook via system_config.
+
+In the `webhooks.object` document, set `include_fields.{DOC_TYPE}` to the list of JSON keys to read from the document.
+
+For instance, if you want to include a user's first/last name, set `"include_fields.user":["first_name", "last_name"]`.
+
+The webhook payload received will then look something like:
+
+```
+id={USER_ID}&account_id={ACCOUNT_ID}&action=doc_created&type=user&last_name={LAST_NAME}&first_name={FIRST_NAME}&cluster_id={CLUSTER_ID}
+```

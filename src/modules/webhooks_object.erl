@@ -120,19 +120,22 @@ handle_event(DocChange, _Props) ->
 
 -spec handle_account_change(kapi_conf:doc(), kz_term:ne_binary()) -> 'ok'.
 handle_account_change(DocChange, AccountId) ->
-    case webhooks_util:find_webhooks(?HOOK_NAME, AccountId) of
-        [] ->
-            lager:debug("no hooks to handle ~s(~s) for ~s", [?HOOK_NAME, kz_api:event_name(DocChange), AccountId]);
-        Hooks ->
-            EventJObj = format_event(DocChange, AccountId),
-            Action = kz_api:event_name(DocChange),
-            Type = kapi_conf:get_type(DocChange),
+    handle_account_change(DocChange, AccountId, webhooks_util:find_webhooks(?HOOK_NAME, AccountId)).
 
-            lager:debug("event for action ~s type ~s", [Action, Type]),
+handle_account_change(_DocChange, _AccountId, []) ->
+    lager:debug("no hooks to handle ~s(~s) for ~s"
+               ,[?HOOK_NAME, kz_api:event_name(_DocChange), _AccountId]
+               );
+handle_account_change(DocChange, AccountId, Hooks) ->
+    EventJObj = format_event(DocChange, AccountId),
 
-            Filtered = [Hook || Hook <- Hooks, match_action_type(Hook, Action, Type)],
-            webhooks_util:fire_hooks(EventJObj, Filtered)
-    end.
+    Action = kz_api:event_name(DocChange),
+    Type = kapi_conf:get_type(DocChange),
+
+    lager:debug("event for action ~s type ~s", [Action, Type]),
+
+    Filtered = [Hook || Hook <- Hooks, match_action_type(Hook, Action, Type)],
+    webhooks_util:fire_hooks(EventJObj, Filtered).
 
 -spec match_action_type(webhook(), kz_term:api_binary(), kz_term:api_binary()) -> boolean().
 match_action_type(#webhook{hook_event = ?HOOK_NAME
@@ -185,12 +188,41 @@ bindings() ->
 %%------------------------------------------------------------------------------
 -spec format_event(kapi_conf:doc(), kz_term:ne_binary()) -> kz_json:object().
 format_event(ConfChange, AccountId) ->
+    DocType = kapi_conf:get_type(ConfChange),
+    DocId = kapi_conf:get_id(ConfChange),
+
     kz_json:from_list(
-      [{<<"id">>, kapi_conf:get_id(ConfChange)}
+      [{<<"id">>, DocId}
       ,{<<"account_id">>, AccountId}
       ,{<<"action">>, kz_api:event_name(ConfChange)}
-      ,{<<"type">>, kapi_conf:get_type(ConfChange)}
+      ,{<<"type">>, DocType}
+      | meta_event_data(kz_datamgr:open_cache_doc(AccountId, DocId), DocType)
       ]).
+
+-spec meta_event_data({'ok', kz_doc:doc()} | kz_datamgr:data_error(), kz_term:ne_binary()) ->
+          kz_json:json_proplist().
+meta_event_data({'error', _E}, _DocType) -> [];
+meta_event_data({'ok', Doc}, DocType) ->
+    {_, Props} = lists:foldl(fun add_meta_event_datum/2
+                            ,{Doc, []}
+                            ,doc_keys(DocType)
+                            ),
+    Props.
+
+-spec add_meta_event_datum(kz_json:get_key(), {kz_doc:doc(), kz_json:json_proplist()}) ->
+          {kz_doc:doc(), kz_json:json_proplist()}.
+add_meta_event_datum(DocKey, {Doc, Props}) ->
+    case kz_json:get_value(DocKey, Doc) of
+        'undefined' -> {Doc, Props};
+        Value -> {Doc, [{DocKey, Value} | Props]}
+    end.
+
+-spec doc_keys(kz_term:ne_binary()) -> [kz_json:get_key()].
+doc_keys(DocType) ->
+    kapps_config:get(<<?APP_NAME/binary,".",?HOOK_NAME/binary>>
+                    ,[<<"include_fields">>, DocType]
+                    ,[]
+                    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
