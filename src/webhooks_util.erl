@@ -489,6 +489,8 @@ hook_event_lowered(<<"channel_create">>) -> <<"CHANNEL_CREATE">>;
 hook_event_lowered(<<"channel_answer">>) -> <<"CHANNEL_ANSWER">>;
 hook_event_lowered(<<"channel_destroy">>) -> <<"CHANNEL_DESTROY">>;
 hook_event_lowered(<<"channel_bridge">>) -> <<"CHANNEL_BRIDGE">>;
+hook_event_lowered(<<"channel_hold">>) -> <<"CHANNEL_HOLD">>;
+hook_event_lowered(<<"channel_unhold">>) -> <<"CHANNEL_UNHOLD">>;
 hook_event_lowered(<<"all">>) -> <<"all">>;
 hook_event_lowered(Event) ->
     'true' = lists:member(Event, available_events()),

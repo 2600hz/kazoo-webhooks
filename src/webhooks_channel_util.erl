@@ -86,6 +86,16 @@ format_event(CallEvent, AccountId, <<"CHANNEL_ANSWER">>) ->
                      ,<<"channel_answer">>
                      ,base_hook_event(CallEvent, AccountId)
                      );
+format_event(CallEvent, AccountId, <<"CHANNEL_HOLD">>) ->
+    kz_json:set_value(<<"hook_event">>
+                     ,<<"channel_hold">>
+                     ,base_hook_event(CallEvent, AccountId)
+                     );
+format_event(CallEvent, AccountId, <<"CHANNEL_UNHOLD">>) ->
+    kz_json:set_value(<<"hook_event">>
+                     ,<<"channel_unhold">>
+                     ,base_hook_event(CallEvent, AccountId)
+                     );
 format_event(CallEvent, AccountId, <<"CHANNEL_BRIDGE">>) ->
     base_hook_event(CallEvent
                    ,AccountId
