@@ -1,6 +1,6 @@
 %%%-----------------------------------------------------------------------------
 %%% @copyright (C) 2010-2021, 2600Hz
-%%%
+%%% Process channel events and send to configured webhooks
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -8,7 +8,11 @@
 %%%
 %%% @end
 %%%-----------------------------------------------------------------------------
--module(webhooks_channel_util).
+-module(webhooks_channel_events).
+
+-export([init/0
+        ,bindings_and_responders/0
+        ]).
 
 -export([handle_event/2]).
 -export([maybe_handle_channel_event/3]).
@@ -19,6 +23,79 @@
 
 -include("webhooks.hrl").
 -include_lib("kazoo_stdlib/include/kz_databases.hrl").
+
+-define(DEFAULT_EVENTS
+        ,[{<<"CHANNEL_CREATE">>, <<"This webhook is triggered when a new channel is created">>}
+         ,{<<"CHANNEL_ANSWER">>, <<"This webhook is triggered when a channel establishes two-way audio, such as a voicemail box or the called party answering">>}
+         ,{<<"CHANNEL_BRIDGE">>, <<"This webhook is triggered when two channels are bridged together, such as two users/devices connected together">>}
+         ,{<<"CHANNEL_DESTROY">>, <<"This webhook is triggered when a channel is destroyed, usually as a result of a hangup">>}
+
+         ,{<<"CHANNEL_HOLD">>, <<"This webhook is triggered when an established call gets put on hold">>}
+         ,{<<"CHANNEL_UNHOLD">>, <<"This webhook is triggered when an established call gets taken off hold">>}
+         ]
+       ).
+
+-define(EVENTS
+       ,kapps_config:get_json(?APP_NAME, <<"channel_events">>, kz_json:from_list(?DEFAULT_EVENTS))
+       ).
+
+-spec init() -> 'ok'.
+init() ->
+    kz_json:foreach(fun init_event/1, ?EVENTS).
+
+init_event({EventName, Description}) ->
+    Id = event_id(EventName),
+    webhooks_util:init_metadata(Id, metadata(EventName, Description, Id)).
+
+event_id(EventName) ->
+    list_to_binary(["webhooks_", kz_term:to_lower_binary(EventName)]).
+
+metadata(EventName, Description, Id) ->
+    kz_json:from_list([{<<"_id">>, Id}
+                      ,{<<"name">>, event_name(EventName)}
+                      ,{<<"description">>, Description}
+                      ]).
+
+event_name(EventName) ->
+    [Channel, Event] = binary:split(kz_term:to_lower_binary(EventName), <<"_">>),
+    list_to_binary([kz_binary:ucfirst(Channel), " ", kz_binary:ucfirst(Event)]).
+
+-spec bindings_and_responders() -> {gen_listener:bindings()
+                                   ,listener_utils:responder_start_params()
+                                   }.
+bindings_and_responders() ->
+    {bindings(), responders()}.
+
+-spec bindings() -> gen_listener:bindings().
+bindings() ->
+    bindings(?EVENTS).
+
+bindings(JObj) ->
+    RestrictTo = kz_json:foldl(fun event_to_binding/3, [], JObj),
+    [{'call', [{'restrict_to', RestrictTo}]}].
+
+event_to_binding(EventName, _Desc, Acc) ->
+    [kz_term:to_atom(EventName, 'true') | Acc].
+
+-spec responders() -> listener_utils:responder_start_params().
+responders() ->
+    [{{'webhooks_channel_events', 'handle_event'}
+     ,[{<<"call_event">>, <<"*">>}]
+     }
+    ].
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+event_init_test_() ->
+    EventName = <<"CHANNEL_DESTROY">>,
+
+    [?_assertEqual(<<"webhooks_channel_destroy">>, event_id(EventName))
+    ,?_assertEqual(<<"Channel Destroy">>, event_name(EventName))
+    ].
+
+-endif.
+
 
 -spec handle_event(kz_call_event:payload(), kz_term:proplist()) -> 'ok'.
 handle_event(CallEvent, _Props) ->

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2020, 2600Hz
+%%% @copyright (C) 2011-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -33,7 +33,7 @@ include_loopback_test_() ->
             ],
     [{test_name(JObj, Hook)
      ,?_assertEqual(Include
-                   ,webhooks_channel_util:is_fireable_hook(JObj, Hook)
+                   ,webhooks_channel_events:is_fireable_hook(JObj, Hook)
                    )
      }
      || {JObj, Hook, Include} <- Tests
