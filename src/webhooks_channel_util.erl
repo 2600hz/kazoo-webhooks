@@ -135,7 +135,7 @@ base_hook_event(CallEvent, AccountId, Acc) ->
       ,{<<"is_internal_leg">>, kz_json:is_true(<<"Channel-Is-Loopback">>, CallEvent)}
       ,{<<"other_leg_call_id">>, kz_call_event:other_leg_call_id(CallEvent)}
       ,{<<"owner_id">>, kz_call_event:owner_id(CallEvent)}
-      ,{<<"request">>, kz_call_event:request(CallEvent)}
+      ,{<<"request">>, kz_json:get_value(<<"Request">>, CallEvent)}
       ,{<<"reseller_id">>, kz_services_reseller:get_id(AccountId)}
       ,{<<"timestamp">>, kz_call_event:timestamp(CallEvent)}
       ,{<<"to">>, kz_json:get_value(<<"To">>, CallEvent)}
