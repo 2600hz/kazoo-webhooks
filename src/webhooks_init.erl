@@ -115,14 +115,11 @@ webhook_modules(_App, {'error', _}) ->
     [].
 
 is_webhook_module(Module) ->
-
-    is_webhook_behaviour(Module)
-        orelse has_webhook_exports(Module).
+    has_webhook_exports(Module)
+        orelse is_webhook_behaviour(Module).
 
 is_webhook_behaviour(Module) ->
-    Attributes = Module:module_info('attributes'),
-    Behaviours = props:get_value('behaviour', Attributes, []),
-    lists:member('gen_webhook', Behaviours).
+    kz_module:has_behaviour(Module, 'gen_webhook').
 
 has_webhook_exports(Module) ->
     kz_module:is_exported(Module, 'init', 0)

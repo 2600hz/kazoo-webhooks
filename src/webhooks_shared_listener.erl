@@ -1,8 +1,6 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc
-%%% @author SIPLABS LLC (Maksim Krzhemenevskiy)
-%%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
 %%% file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,7 +18,7 @@
 
         ,add_account_bindings/0
         ,remove_account_bindings/0
-        ,load_module/1
+        ,load_modules/0, load_module/1
         ]).
 -export([init/1
         ,handle_call/3
@@ -88,10 +86,17 @@ load_module_bindings_and_responders() ->
                ,webhooks_init:existing_modules()
                ).
 
+-spec load_modules() -> 'ok'.
+load_modules() ->
+    _ = [load_module(M) || M <- webhooks_init:existing_modules()],
+    'ok'.
+
 -spec load_module(module()) -> 'ok'.
 load_module(Module) ->
-    _ = load_module_fold(Module, {[], []}),
-    'ok'.
+    {Bindings, Responders} = load_module_fold(Module, {[], []}),
+    _ = [gen_listener:add_binding(?SERVER, Binding) || Binding <- Bindings],
+    _ = [gen_listener:add_responder(?SERVER, Responder, Key) || {Responder, Key} <- Responders],
+    lager:debug("loaded module ~p bindings and responders", [Module]).
 
 -spec load_module_fold(atom(), load_acc()) -> load_acc().
 load_module_fold(Module, {Bindings, Responders}=Acc) ->

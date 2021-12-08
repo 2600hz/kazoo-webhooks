@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -16,6 +16,7 @@
         ,bindings_and_responders/0
         ,account_bindings/1
         ,handle_event/2
+        ,doc_keys/1
         ]).
 
 -include("webhooks.hrl").
@@ -211,20 +212,36 @@ meta_event_data({'ok', Doc}, DocType) ->
                             ),
     Props.
 
--spec add_meta_event_datum(kz_json:get_key(), {kz_doc:doc(), kz_json:json_proplist()}) ->
+-spec add_meta_event_datum({kz_json:get_key(), kz_json:get_key()}
+                          ,{kz_doc:doc(), kz_json:json_proplist()}
+                          ) ->
           {kz_doc:doc(), kz_json:json_proplist()}.
-add_meta_event_datum(DocKey, {Doc, Props}) ->
+add_meta_event_datum({DocKey, HookKey}, {Doc, Props}) ->
     case kz_json:get_value(DocKey, Doc) of
         'undefined' -> {Doc, Props};
-        Value -> {Doc, [{DocKey, Value} | Props]}
+        Value -> {Doc, [{HookKey, Value} | Props]}
     end.
 
--spec doc_keys(kz_term:ne_binary()) -> [kz_json:get_key()].
+-spec doc_keys(kz_term:ne_binary()) -> [{kz_json:get_key(), kz_json:get_key()}].
 doc_keys(DocType) ->
-    kapps_config:get(<<?APP_NAME/binary,".",?HOOK_NAME/binary>>
-                    ,[<<"include_fields">>, DocType]
-                    ,[]
-                    ).
+    ConfiguredKeys = configured_keys(DocType),
+    [{DocKey, maybe_remove_pvt(DocKey)} || DocKey <- ConfiguredKeys].
+
+configured_keys(DocType) ->
+    kapps_config:get_ne_binaries(<<?APP_NAME/binary, ".", ?HOOK_NAME/binary>>
+                                ,[<<"include_fields">>, <<"default">>]
+                                ,[<<"pvt_auth_account_id">>
+                                 ,<<"pvt_auth_user_id">>
+                                 ]
+                                )
+        ++ kapps_config:get_ne_binaries(<<?APP_NAME/binary,".",?HOOK_NAME/binary>>
+                                       ,[<<"include_fields">>, DocType]
+                                       ,[]
+                                       ).
+
+maybe_remove_pvt(<<"_", Key/binary>>) -> Key;
+maybe_remove_pvt(<<"pvt_", Key/binary>>) -> Key;
+maybe_remove_pvt(Key) -> Key.
 
 %%------------------------------------------------------------------------------
 %% @doc
