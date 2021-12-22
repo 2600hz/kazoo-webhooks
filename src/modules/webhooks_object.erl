@@ -10,6 +10,8 @@
 %%%-----------------------------------------------------------------------------
 -module(webhooks_object).
 
+-behaviour(gen_webhook).
+
 -export([init/0
         ,bindings_and_responders/0
         ,account_bindings/1

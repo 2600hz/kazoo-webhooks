@@ -12,6 +12,8 @@
 %%%-----------------------------------------------------------------------------
 -module(webhooks_parking).
 
+-behaviour(gen_webhook).
+
 -export([init/0
         ,bindings_and_responders/0
         ,handle/2

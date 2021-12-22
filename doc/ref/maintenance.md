@@ -17,3 +17,4 @@
 | `set_disable_threshold/2` | `(Account,Count)` | |
 | `set_failure_expiry/1` | `(Expires)` | |
 | `set_failure_expiry/2` | `(Account,Expires)` | |
+| `start_module/1` | `(ModuleBin)` | |

@@ -10,6 +10,8 @@
 %%%-----------------------------------------------------------------------------
 -module(webhooks_skel).
 
+-behaviour(gen_webhook).
+
 -export([init/0
         ,bindings_and_responders/0
         ,handle_event/2

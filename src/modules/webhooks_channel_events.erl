@@ -10,6 +10,8 @@
 %%%-----------------------------------------------------------------------------
 -module(webhooks_channel_events).
 
+-behaviour(gen_webhook).
+
 -export([init/0
         ,bindings_and_responders/0
         ]).
@@ -25,14 +27,14 @@
 -include_lib("kazoo_stdlib/include/kz_databases.hrl").
 
 -define(DEFAULT_EVENTS
-        ,[{<<"CHANNEL_CREATE">>, <<"This webhook is triggered when a new channel is created">>}
-         ,{<<"CHANNEL_ANSWER">>, <<"This webhook is triggered when a channel establishes two-way audio, such as a voicemail box or the called party answering">>}
-         ,{<<"CHANNEL_BRIDGE">>, <<"This webhook is triggered when two channels are bridged together, such as two users/devices connected together">>}
-         ,{<<"CHANNEL_DESTROY">>, <<"This webhook is triggered when a channel is destroyed, usually as a result of a hangup">>}
+       ,[{<<"CHANNEL_CREATE">>, <<"This webhook is triggered when a new channel is created">>}
+        ,{<<"CHANNEL_ANSWER">>, <<"This webhook is triggered when a channel establishes two-way audio, such as a voicemail box or the called party answering">>}
+        ,{<<"CHANNEL_BRIDGE">>, <<"This webhook is triggered when two channels are bridged together, such as two users/devices connected together">>}
+        ,{<<"CHANNEL_DESTROY">>, <<"This webhook is triggered when a channel is destroyed, usually as a result of a hangup">>}
 
-         ,{<<"CHANNEL_HOLD">>, <<"This webhook is triggered when an established call gets put on hold">>}
-         ,{<<"CHANNEL_UNHOLD">>, <<"This webhook is triggered when an established call gets taken off hold">>}
-         ]
+        ,{<<"CHANNEL_HOLD">>, <<"This webhook is triggered when an established call gets put on hold">>}
+        ,{<<"CHANNEL_UNHOLD">>, <<"This webhook is triggered when an established call gets taken off hold">>}
+        ]
        ).
 
 -define(EVENTS
