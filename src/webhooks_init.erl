@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,7 +10,7 @@
 -module(webhooks_init).
 
 -export([start_link/0
-        ,init_modules/0
+        ,init_modules/0, init_module/1
         ,existing_modules/0
         ,maybe_init_account/2
         ]).
@@ -92,46 +92,19 @@ init_module(Module) ->
 
 -spec existing_modules() -> kz_term:atoms().
 existing_modules() ->
-    KazooApplications =
-        sets:to_list(
-          sets:from_list(
-            kapps_controller:start_which_kapps() ++ [?APP_NAME]
-           )
-         ),
-    lists:foldl(fun existing_modules_fold/2, [], KazooApplications).
-
--spec existing_modules_fold(atom(), kz_term:atoms()) -> kz_term:atoms().
-existing_modules_fold(ApplicationName, Modules) ->
-    ApplicationModules = find_application_webhook_modules(ApplicationName),
-    _ = [lager:debug("found ~s webhook module ~s", [ApplicationName, ApplicationModule])
-         || ApplicationModule <- ApplicationModules
-        ],
-    ApplicationModules ++ Modules.
-
--spec find_application_webhook_modules(kz_term:text()) -> kz_term:atoms().
-find_application_webhook_modules(ApplicationName) ->
-    case code:lib_dir(kz_term:to_atom(ApplicationName, 'true')) of
-        {'error', 'bad_name'} -> [];
-        BasePath -> find_path_webhook_modules(BasePath)
-    end.
-
--spec find_path_webhook_modules(string()) -> kz_term:atoms().
-find_path_webhook_modules(BasePath) ->
-    EbinDirectory = filename:join(BasePath, "ebin"),
-    Extension = ".beam",
-    Utils = ["webhooks_app"
-            ,"webhooks_channel_util"
-            ,"webhooks_disabler"
-            ,"webhooks_init"
-            ,"webhooks_listener"
-            ,"webhooks_maintenance"
-            ,"webhooks_shared_listener"
-            ,"webhooks_skel"
-            ,"webhooks_sup"
-            ,"webhooks_util"
-            ],
-    Pattern = filename:join(EbinDirectory, "webhooks_*" ++ Extension),
-    [kz_term:to_atom(Module, 'true')
-     || Path <- filelib:wildcard(Pattern),
-        not lists:member((Module=filename:basename(Path, Extension)), Utils)
+    [Module || {Module, _} <- code:all_loaded(),
+               is_webhook_module(Module)
     ].
+
+is_webhook_module(Module) ->
+    is_webhook_behaviour(Module)
+        orelse has_webhook_exports(Module).
+
+is_webhook_behaviour(Module) ->
+    Attributes = Module:module_info('attributes'),
+    Behaviours = props:get_value('behaviour', Attributes, []),
+    lists:member('gen_webhook', Behaviours).
+
+has_webhook_exports(Module) ->
+    kz_module:is_exported(Module, 'init', 0)
+        andalso kz_module:is_exported(Module, 'bindings_and_responders', 0).

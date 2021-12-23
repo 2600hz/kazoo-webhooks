@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc
 %%% @author SIPLABS LLC (Maksim Krzhemenevskiy)
 %%%
@@ -20,6 +20,7 @@
 
         ,add_account_bindings/0
         ,remove_account_bindings/0
+        ,load_module/1
         ]).
 -export([init/1
         ,handle_call/3
@@ -86,6 +87,11 @@ load_module_bindings_and_responders() ->
                ,{?BINDINGS, ?RESPONDERS}
                ,webhooks_init:existing_modules()
                ).
+
+-spec load_module(atom()) -> 'ok'.
+load_module(Module) ->
+    _ = load_module_fold(Module, {[], []}),
+    'ok'.
 
 -spec load_module_fold(atom(), load_acc()) -> load_acc().
 load_module_fold(Module, {Bindings, Responders}=Acc) ->

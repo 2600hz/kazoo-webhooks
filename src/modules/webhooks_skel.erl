@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -9,6 +9,8 @@
 %%% @end
 %%%-----------------------------------------------------------------------------
 -module(webhooks_skel).
+
+-behaviour(gen_webhook).
 
 -export([init/0
         ,bindings_and_responders/0

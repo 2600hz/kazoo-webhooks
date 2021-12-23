@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2020, 2600Hz
+%%% @copyright (C) 2013-2021, 2600Hz
 %%% @doc
 %%% @author James Aimonetti
 %%%
@@ -24,6 +24,7 @@
 
         ,reset_hook_definitions/0
         ,reset_hook_definition/1
+        ,start_module/1
         ]).
 
 -include("webhooks.hrl").
@@ -182,3 +183,9 @@ handle_deleted(Deleted) ->
     maybe_log_failed(Failed),
 
     reinit_hook_definitions([kz_doc:id(D) || D <- Success]).
+
+-spec start_module(kz_term:ne_binary()) -> 'ok'.
+start_module(ModuleBin) ->
+    Module = kz_term:to_atom(ModuleBin),
+    webhooks_init:init_module(Module),
+    webhooks_shared_listener:load_module(Module).
