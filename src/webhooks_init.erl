@@ -92,11 +92,30 @@ init_module(Module) ->
 
 -spec existing_modules() -> kz_term:atoms().
 existing_modules() ->
-    [Module || {Module, _} <- code:all_loaded(),
-               is_webhook_module(Module)
-    ].
+    AppFiles = filelib:wildcard(filename:join([code:lib_dir('webhooks'), "..", "*", "ebin", "*.app"])),
+    app_modules(AppFiles, []).
+
+app_modules([], WebhookModules) -> WebhookModules;
+app_modules([AppFile | AppFiles], WebhookModules) ->
+    Modules = webhook_modules(AppFile),
+    app_modules(AppFiles, Modules ++ WebhookModules).
+
+webhook_modules(AppFile) ->
+    App = kz_term:to_atom(filename:basename(AppFile, <<".app">>)),
+    webhook_modules(App, application:load(App)).
+
+webhook_modules(App, 'ok') ->
+    {'ok', Modules} = application:get_key(App, 'modules'),
+    [Module || Module <- Modules, is_webhook_module(Module)];
+webhook_modules(App, {'error',{'already_loaded', App}}) ->
+    {'ok', Modules} = application:get_key(App, 'modules'),
+    [Module || Module <- Modules, is_webhook_module(Module)];
+webhook_modules(_App, {'error', _}) ->
+    %% when no .app file actually exists
+    [].
 
 is_webhook_module(Module) ->
+
     is_webhook_behaviour(Module)
         orelse has_webhook_exports(Module).
 
