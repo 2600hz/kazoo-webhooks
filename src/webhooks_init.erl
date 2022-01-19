@@ -101,7 +101,7 @@ app_modules([AppFile | AppFiles], WebhookModules) ->
     app_modules(AppFiles, Modules ++ WebhookModules).
 
 webhook_modules(AppFile) ->
-    App = kz_term:to_atom(filename:basename(AppFile, <<".app">>)),
+    App = kz_term:to_atom(filename:basename(AppFile, <<".app">>), 'true'),
     webhook_modules(App, application:load(App)).
 
 webhook_modules(App, 'ok') ->
