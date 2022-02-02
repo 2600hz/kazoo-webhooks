@@ -74,6 +74,7 @@
 %%------------------------------------------------------------------------------
 -spec init() -> 'ok'.
 init() ->
+    _ = default_keys(),
     webhooks_util:init_metadata(?ID, ?METADATA).
 
 %%------------------------------------------------------------------------------
@@ -228,16 +229,20 @@ doc_keys(DocType) ->
     [{DocKey, maybe_remove_pvt(DocKey)} || DocKey <- ConfiguredKeys].
 
 configured_keys(DocType) ->
+    default_keys()
+        ++ kapps_config:get_ne_binaries(<<?APP_NAME/binary,".",?HOOK_NAME/binary>>
+                                       ,[<<"include_fields">>, DocType]
+                                       ,[]
+                                       ).
+
+-spec default_keys() -> kz_term:ne_binaries().
+default_keys() ->
     kapps_config:get_ne_binaries(<<?APP_NAME/binary, ".", ?HOOK_NAME/binary>>
                                 ,[<<"include_fields">>, <<"default">>]
                                 ,[<<"pvt_auth_account_id">>
                                  ,<<"pvt_auth_user_id">>
                                  ]
-                                )
-        ++ kapps_config:get_ne_binaries(<<?APP_NAME/binary,".",?HOOK_NAME/binary>>
-                                       ,[<<"include_fields">>, DocType]
-                                       ,[]
-                                       ).
+                                ).
 
 maybe_remove_pvt(<<"_", Key/binary>>) -> Key;
 maybe_remove_pvt(<<"pvt_", Key/binary>>) -> Key;
