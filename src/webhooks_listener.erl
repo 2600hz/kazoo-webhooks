@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2022, 2600Hz
 %%% @doc
 %%% @author James Aimonetti
 %%%
@@ -86,7 +86,7 @@ handle_config(JObj, Srv, ?DOC_EDITED) ->
     case kapi_conf:get_id(JObj) of
         'undefined' -> find_and_update_hook(JObj, Srv);
         HookId ->
-            {'ok', Hook} = kz_datamgr:open_cache_doc(?KZ_WEBHOOKS_DB, HookId),
+            {'ok', Hook} = kz_datamgr:open_doc(?KZ_WEBHOOKS_DB, HookId),
             case (not kapi_conf:get_is_soft_deleted(JObj))
                 andalso kzd_webhooks:enabled(Hook)
             of
