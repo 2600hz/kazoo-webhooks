@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%%
 %%%
 %%% @author Peter Defebvre
@@ -65,20 +65,22 @@ bindings_and_responders() ->
 %%------------------------------------------------------------------------------
 -spec handle(kapi_call:event(), kz_term:proplist()) -> 'ok'.
 handle(CallEvent, _Props) ->
+    HookEvent = kz_api:event_name(CallEvent),
+
     'true' = kapi_call:event_v(CallEvent),
     AccountId = kz_json:get_value([<<"Custom-Channel-Vars">>, <<"Account-ID">>], CallEvent),
-    maybe_send_event(AccountId, format(CallEvent)).
+    maybe_send_event(AccountId, format(CallEvent), format_v2_event(CallEvent, HookEvent)).
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec maybe_send_event(kz_term:api_binary(), kz_json:object()) -> 'ok'.
-maybe_send_event('undefined', _JObj) -> 'ok';
-maybe_send_event(AccountId, JObj) ->
+-spec maybe_send_event(kz_term:api_binary(), kz_json:object(), kz_json:object()) -> 'ok'.
+maybe_send_event('undefined', _JObj, _V2JObj) -> 'ok';
+maybe_send_event(AccountId, JObj, V2JObj) ->
     case webhooks_util:find_webhooks(?HOOK_NAME, AccountId) of
         [] -> lager:debug("no hooks to handle for ~s", [AccountId]);
-        Hooks -> webhooks_util:fire_hooks(JObj, Hooks)
+        Hooks -> webhooks_util:fire_hooks(JObj, V2JObj, Hooks)
     end.
 
 %%------------------------------------------------------------------------------
@@ -97,3 +99,15 @@ format(CallEvent) ->
                  ,<<"Custom-Channel-Vars">>
                  ],
     kz_json:normalize_jobj(CallEvent1, RemoveKeys, []).
+
+-spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
+          kz_json:object().
+format_v2_event(CallEvent, HookEvent) ->
+    NormJObj = kz_json:normalize_jobj(
+                 kz_api:public_fields(CallEvent)
+                ),
+    Msg = [{<<"action">>, <<"event">>}
+          ,{<<"name">>, HookEvent}
+          ,{<<"data">>, NormJObj}
+          ],
+    kz_json:from_list(Msg).

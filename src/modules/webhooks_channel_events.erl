@@ -123,7 +123,10 @@ maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent
 -spec maybe_fire_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:payload(), webhooks()) -> 'ok'.
 maybe_fire_event(AccountId, HookEvent, CallEvent, Hooks) ->
     FireAbleHooks = fireable_hooks(CallEvent, Hooks),
-    webhooks_util:fire_hooks(format_event(CallEvent, AccountId, HookEvent), FireAbleHooks).
+    webhooks_util:fire_hooks(format_event(CallEvent, AccountId, HookEvent)
+                            ,format_v2_event(CallEvent, HookEvent)
+                            ,FireAbleHooks
+                            ).
 
 -spec fireable_hooks(kz_call_event:payload(), webhooks()) -> webhooks().
 fireable_hooks(CallEvent, Hooks) ->
@@ -262,6 +265,18 @@ non_reserved_ccvs(CCVs, Keys) ->
 
 -spec cavs(kz_call_event:payload()) -> kz_term:api_object().
 cavs(CallEvent) -> kz_call_event:custom_application_vars(CallEvent).
+
+-spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
+          kz_json:object().
+format_v2_event(CallEvent, HookEvent) ->
+    NormJObj = kz_json:normalize_jobj(
+                 kz_api:public_fields(CallEvent)
+                ),
+    Msg = [{<<"action">>, <<"event">>}
+          ,{<<"name">>, HookEvent}
+          ,{<<"data">>, NormJObj}
+          ],
+    kz_json:from_list(Msg).
 
 -spec find_account_in_event(kz_call_event:payload()) -> kz_term:api_ne_binary().
 find_account_in_event(CallEvent) ->
