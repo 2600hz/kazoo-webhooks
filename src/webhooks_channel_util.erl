@@ -1,6 +1,6 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
-%%%
+%%% @copyright (C) 2010-2022, 2600Hz
+%%% Process channel events and send to configured webhooks
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -35,7 +35,7 @@ maybe_handle_channel_event('undefined', HookEvent, CallEvent) ->
     end;
 maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent) ->
     lager:debug("evt ~s for ~s", [HookEvent, AccountId]),
-    case webhooks_util:find_webhooks(HookEvent, AccountId) of
+    case webhooks_util:find_webhooks(kz_term:to_lower_binary(HookEvent), AccountId) of
         [] -> lager:debug("no hooks to handle ~s for ~s", [HookEvent, AccountId]);
         Hooks ->
             maybe_fire_event(AccountId, HookEvent, CallEvent, Hooks)
@@ -104,7 +104,12 @@ format_event(CallEvent, AccountId, <<"CHANNEL_DESTROY">>) ->
                     ,{<<"ringing_seconds">>, kz_call_event:ringing_seconds(CallEvent)}
                     ,{<<"billing_seconds">>, kz_call_event:billing_seconds(CallEvent)}
                     ]
-                   ).
+                   );
+format_event(CallEvent, AccountId, HookEvent) ->
+    kz_json:set_value(<<"hook_event">>
+                     ,kz_term:to_lower_binary(HookEvent)
+                     ,base_hook_event(CallEvent, AccountId)
+                     ).
 
 -spec base_hook_event(kz_call_event:payload(), kz_term:api_binary()) -> kz_json:object().
 base_hook_event(CallEvent, AccountId) ->
