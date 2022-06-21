@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2022, 2600Hz
 %%% @doc
 %%% @author Peter Defebvre
 %%%
@@ -21,7 +21,6 @@
 -export([init_webhooks/0
         ,init_webhook_db/0
         ,jobj_to_rec/1
-        ,hook_event_lowered/1
         ,hook_event/1
         ,load_hooks/1
         ,load_hook/2
@@ -485,12 +484,6 @@ hook_id(AccountId, Id) ->
 hook_event(Bin) -> hook_event_lowered(kz_term:to_lower_binary(Bin)).
 
 -spec hook_event_lowered(kz_term:ne_binary()) -> kz_term:ne_binary().
-hook_event_lowered(<<"channel_create">>) -> <<"CHANNEL_CREATE">>;
-hook_event_lowered(<<"channel_answer">>) -> <<"CHANNEL_ANSWER">>;
-hook_event_lowered(<<"channel_destroy">>) -> <<"CHANNEL_DESTROY">>;
-hook_event_lowered(<<"channel_bridge">>) -> <<"CHANNEL_BRIDGE">>;
-hook_event_lowered(<<"channel_hold">>) -> <<"CHANNEL_HOLD">>;
-hook_event_lowered(<<"channel_unhold">>) -> <<"CHANNEL_UNHOLD">>;
 hook_event_lowered(<<"all">>) -> <<"all">>;
 hook_event_lowered(Event) ->
     'true' = lists:member(Event, available_events()),
@@ -751,21 +744,21 @@ enable_account_hooks(Account) ->
                                 ]
                                )
     of
-        {'ok', []} -> io:format("account ~s has no webhooks configured~n", [AccountId]);
+        {'ok', []} -> lager:debug("account ~s has no webhooks configured~n", [AccountId]);
         {'ok', Hooks} -> enable_hooks(Hooks);
-        {'error', _E} -> io:format("failed to load hooks for account ~s: ~p~n", [AccountId, _E])
+        {'error', _E} -> lager:debug("failed to load hooks for account ~s: ~p~n", [AccountId, _E])
     end.
 
 -spec enable_hooks(kz_json:objects()) -> 'ok'.
 enable_hooks(Hooks) ->
     case hooks_to_reenable(Hooks) of
-        [] -> io:format("no hooks to re-enable~n", []);
+        [] -> lager:debug("no hooks to re-enable~n", []);
         Reenable ->
             {'ok', Saved} = kz_datamgr:save_docs(?KZ_WEBHOOKS_DB, Reenable),
             _ = webhooks_disabler:flush_hooks(Reenable),
-            io:format("re-enabled ~p hooks~nIDs: ", [length(Saved)]),
+            lager:debug("re-enabled ~p hooks~nIDs: ", [length(Saved)]),
             Ids = kz_binary:join([kz_doc:id(D) || D <- Saved], <<", ">>),
-            io:format("~s~n", [Ids])
+            lager:debug("~s~n", [Ids])
     end.
 
 -spec hooks_to_reenable(kz_json:objects()) -> kz_json:objects().
@@ -793,7 +786,7 @@ enable_descendant_hooks(Account) ->
                                            ]
                                           );
         {'error', _E} ->
-            io:format("failed to find descendants for account ~s: ~p~n", [AccountId, _E])
+            lager:debug("failed to find descendants for account ~s: ~p~n", [AccountId, _E])
     end.
 
 -spec maybe_enable_descendants_hooks(kz_term:ne_binaries()) -> 'ok'.
@@ -802,7 +795,7 @@ maybe_enable_descendants_hooks(Accounts) ->
 
 -spec maybe_enable_descendant_hooks(kz_term:ne_binary()) -> 'ok'.
 maybe_enable_descendant_hooks(Account) ->
-    io:format("## checking account ~s for hooks to enable ##~n", [Account]),
+    lager:debug("## checking account ~s for hooks to enable ##~n", [Account]),
     enable_account_hooks(Account).
 
 -spec init_metadata(kz_term:ne_binary(), kz_json:object()) -> 'ok'.
