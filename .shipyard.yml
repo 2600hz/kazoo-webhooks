@@ -1,12 +1,13 @@
 ---
 name: kazoo-application-webhooks
 base_branch: origin/master
+exposure: private
 metapackage:
   - name: meta-kazoo-applications
     type: required
     branch: master
     package: kazoo-application-webhooks
-base_core: kazoo
+base_core: kazoo-core
 template: kazoo-application.spec.tmpl
 package:
   centos7:
