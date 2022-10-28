@@ -102,6 +102,7 @@ to_json(#webhook{}=Hook) ->
       ,{<<"version">>, kz_term:to_binary(Hook#webhook.version)}
       ,{<<"custom_data">>, Hook#webhook.custom_data}
       ,{<<"modifiers">>, Hook#webhook.modifiers}
+      ,{<<"security">>, Hook#webhook.security}
       ]).
 
 -spec find_webhooks(kz_term:ne_binary(), kz_term:api_binary()) -> webhooks().
@@ -173,7 +174,7 @@ fire_hooks(JObj, Hooks) ->
 -spec fire_hooks(kz_json:object(), kz_json:object(), webhooks()) -> 'ok'.
 fire_hooks(_, _, []) -> 'ok';
 fire_hooks(JObj, V2JObj, [#webhook{version = 'v2'} = Hook | Hooks]) ->
-    maybe_fire_hook(V2JObj, Hook),
+    maybe_fire_hook(maybe_augment_event(Hook, V2JObj), Hook),
     fire_hooks(JObj, V2JObj, Hooks);
 fire_hooks(JObj, V2JObj, [Hook | Hooks]) ->
     NewJObj = kz_json:set_value(<<"cluster_id">>, kzd_cluster:id(), JObj),
@@ -669,6 +670,7 @@ jobj_to_rec(Webhook) ->
             ,custom_data = kzd_webhooks:custom_data(Webhook)
             ,modifiers = kzd_webhooks:modifiers(Webhook)
             ,format = kzd_webhooks:format(Webhook)
+            ,security = kzd_webhooks:security_settings(Webhook)
             }.
 
 -spec init_webhooks() -> 'ok'.
@@ -861,3 +863,29 @@ fetch_available_events() ->
             kz_cache:store_local(?CACHE_NAME, ?AVAILABLE_EVENT_KEY, EventIds, CacheProps),
             EventIds
     end.
+
+maybe_augment_event(#webhook{security='undefined'}, V2JObj) ->
+    add_timestamp(V2JObj);
+maybe_augment_event(#webhook{security=Security}, V2JObj) ->
+    maybe_add_hmac(V2JObj, kz_json:get_ne_binary_value(<<"sha256_key">>, Security)).
+
+add_timestamp(V2JObj) ->
+    kz_json:set_value(<<"timestamp">>, kz_time:now_s(), V2JObj).
+
+maybe_add_hmac(V2JObj, 'undefined') ->
+    add_timestamp(V2JObj);
+maybe_add_hmac(V2JObj, SHA256) ->
+    add_hmac(V2JObj, SHA256).
+
+add_hmac(V2JObj, SHA256) ->
+    Timestamp = kz_time:now_s(),
+    DataJSON = kz_json:encode(kz_json:get_json_value(<<"data">>, V2JObj), ['canonical']),
+
+    MAC = crypto:mac('hmac', 'sha256', SHA256
+                    ,<<(kz_term:to_binary(Timestamp))/binary, DataJSON/binary>>
+                    ),
+    kz_json:set_values([{<<"timestamp">>, Timestamp}
+                       ,{<<"hmac">>, base64:encode(MAC)}
+                       ]
+                      ,V2JObj
+                      ).

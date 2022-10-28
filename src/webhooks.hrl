@@ -24,6 +24,7 @@
                  ,custom_data :: kz_term:api_object() | '_'
                  ,modifiers :: kz_term:api_object() | '_'
                  ,format = 'form-data' :: 'form-data' | 'json' | '_'
+                 ,security :: kz_term:api_object() | '_'
                  }).
 -type webhook() :: #webhook{}.
 -type webhooks() :: [webhook()].
