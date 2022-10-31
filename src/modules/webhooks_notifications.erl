@@ -118,7 +118,7 @@ handle_event(Notification, _Props) ->
 handle_account_notification(Notification, <<"webhook">>) ->
     Hook = webhooks_util:from_json(kz_json:get_ne_json_value(<<"Hook">>, Notification, kz_json:new())),
     Data = kz_json:normalize(kz_json:get_ne_json_value(<<"Data">>, Notification, kz_json:new())),
-    webhooks_util:fire_hooks(Data, [Hook]);
+    webhooks_util:fire_hooks(Data, Data, [Hook]);
 handle_account_notification(Notification, EventName) ->
     AccountId = kapi_notifications:account_id(Notification),
     lager:info("searching for hook ~s(~s) for account ~s", [EventName, ?HOOK_NAME, AccountId]),
@@ -130,10 +130,11 @@ handle_account_notification(_Notification, _EventName, _AccountId, []) ->
     lager:debug("no hooks to handle ~s for ~s", [_EventName, _AccountId]);
 handle_account_notification(Notification, EventName, _AccountId, Hooks) ->
     Event = kz_json:normalize(Notification),
+    V2Event = format_v2_event(Notification, EventName),
     Filtered = [Hook || Hook <- Hooks, match_action_type(Hook, EventName)],
 
     lager:debug("found ~b hook(s) to handle ~s", [length(Filtered), EventName]),
-    webhooks_util:fire_hooks(Event, Filtered).
+    webhooks_util:fire_hooks(Event, V2Event, Filtered).
 
 -spec assert_valid(kapi_notifications:doc(), kz_term:ne_binary()) -> 'true'.
 assert_valid(Notification, EventName) ->
@@ -167,3 +168,15 @@ get_notifications_definition() ->
         kapi_definition:name(Definition) =/= <<"skel">>,
         kapi_definition:name(Definition) =/= <<"notify_update">>
     ].
+
+-spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
+          kz_json:object().
+format_v2_event(CallEvent, HookEvent) ->
+    NormJObj = kz_json:normalize_jobj(
+                 kz_api:public_fields(CallEvent)
+                ),
+    Msg = [{<<"action">>, <<"event">>}
+          ,{<<"name">>, HookEvent}
+          ,{<<"data">>, NormJObj}
+          ],
+    kz_json:from_list(Msg).

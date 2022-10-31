@@ -17,7 +17,7 @@
 -export([find_webhooks/2
         ,delete_account_webhooks/1
         ]).
--export([fire_hooks/2]).
+-export([fire_hooks/2, fire_hooks/3]).
 -export([init_webhooks/0
         ,init_webhook_db/0
         ,jobj_to_rec/1
@@ -99,6 +99,7 @@ to_json(#webhook{}=Hook) ->
       ,{<<"account_id">>, Hook#webhook.account_id}
       ,{<<"include_subaccounts">>, Hook#webhook.include_subaccounts}
       ,{<<"include_internal_legs">>, Hook#webhook.include_loopback}
+      ,{<<"version">>, kz_term:to_binary(Hook#webhook.version)}
       ,{<<"custom_data">>, Hook#webhook.custom_data}
       ,{<<"modifiers">>, Hook#webhook.modifiers}
       ]).
@@ -166,10 +167,18 @@ match_subaccount_webhooks(HookEvent, AccountId) ->
     ets:select(table_id(), MatchSpec).
 
 -spec fire_hooks(kz_json:object(), webhooks()) -> 'ok'.
-fire_hooks(_, []) -> 'ok';
-fire_hooks(JObj, [Hook | Hooks]) ->
-    maybe_fire_hook(JObj, Hook),
-    fire_hooks(JObj, Hooks).
+fire_hooks(JObj, Hooks) ->
+    fire_hooks(JObj, JObj, Hooks).
+
+-spec fire_hooks(kz_json:object(), kz_json:object(), webhooks()) -> 'ok'.
+fire_hooks(_, _, []) -> 'ok';
+fire_hooks(JObj, V2JObj, [#webhook{version = 'v2'} = Hook | Hooks]) ->
+    maybe_fire_hook(V2JObj, Hook),
+    fire_hooks(JObj, V2JObj, Hooks);
+fire_hooks(JObj, V2JObj, [Hook | Hooks]) ->
+    NewJObj = kz_json:set_value(<<"cluster_id">>, kzd_cluster:id(), JObj),
+    maybe_fire_hook(NewJObj, Hook),
+    fire_hooks(JObj, V2JObj, Hooks).
 
 -spec maybe_fire_hook(kz_json:object(), webhook()) -> 'ok'.
 maybe_fire_hook(JObj, #webhook{modifiers='undefined'}=Hook) ->
@@ -202,8 +211,7 @@ maybe_fire_foldl(Key, Value, {_ShouldFire, JObj}) ->
 -spec fire_hook(kz_json:object(), webhook()) -> 'ok'.
 fire_hook(JObj, #webhook{custom_data = 'undefined'} = Hook) ->
     EventId = kz_binary:rand_hex(5),
-    NewJObj = kz_json:set_value(<<"cluster_id">>, kzd_cluster:id(), JObj),
-    do_fire(Hook, EventId, NewJObj);
+    do_fire(Hook, EventId, JObj);
 fire_hook(JObj, #webhook{custom_data = CustomData} = Hook) ->
     WithoutTypeAction = kz_json:delete_keys([<<"type">>, <<"action">>], CustomData),
     NewJObj = kz_json:merge_jobjs(WithoutTypeAction, JObj),
@@ -657,6 +665,7 @@ jobj_to_rec(Webhook) ->
             ,account_id = kz_doc:account_id(Webhook)
             ,include_subaccounts = kzd_webhooks:include_subaccounts(Webhook)
             ,include_loopback = kzd_webhooks:include_internal_legs(Webhook)
+            ,version = kz_term:to_atom(kzd_webhooks:version(Webhook))
             ,custom_data = kzd_webhooks:custom_data(Webhook)
             ,modifiers = kzd_webhooks:modifiers(Webhook)
             ,format = kzd_webhooks:format(Webhook)
