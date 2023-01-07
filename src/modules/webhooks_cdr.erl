@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2022, 2600Hz
+%%% @copyright (C) 2010-2023, 2600Hz
 %%% Process cdr events and send to configured webhooks
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
