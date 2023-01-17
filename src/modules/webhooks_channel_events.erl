@@ -17,7 +17,6 @@
         ]).
 
 -export([handle_event/2]).
--export([maybe_handle_channel_event/3]).
 
 -ifdef(TEST).
 -export([is_fireable_hook/2]).
@@ -113,6 +112,11 @@ maybe_handle_channel_event('undefined', HookEvent, CallEvent) ->
             maybe_handle_channel_event(AccountId, HookEvent, CallEvent)
     end;
 maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent) ->
+    FindHooks = fun() -> maybe_find_hooks_for_event(AccountId, HookEvent, CallEvent) end,
+    kz_api:do_if_event_visible_to_account(FindHooks, AccountId, CallEvent).
+
+-spec maybe_find_hooks_for_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:payload()) -> 'ok'.
+maybe_find_hooks_for_event(AccountId, HookEvent, CallEvent) ->
     lager:debug("evt ~s for ~s", [HookEvent, AccountId]),
     case webhooks_util:find_webhooks(kz_term:to_lower_binary(HookEvent), AccountId) of
         [] -> lager:debug("no hooks to handle ~s for ~s", [HookEvent, AccountId]);
