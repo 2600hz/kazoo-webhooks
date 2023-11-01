@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2023, 2600Hz
 %%% @doc
 %%% @author Peter Defebvre
 %%%
@@ -17,11 +17,10 @@
 -export([find_webhooks/2
         ,delete_account_webhooks/1
         ]).
--export([fire_hooks/2]).
+-export([fire_hooks/2, fire_hooks/3]).
 -export([init_webhooks/0
         ,init_webhook_db/0
         ,jobj_to_rec/1
-        ,hook_event_lowered/1
         ,hook_event/1
         ,load_hooks/1
         ,load_hook/2
@@ -100,8 +99,10 @@ to_json(#webhook{}=Hook) ->
       ,{<<"account_id">>, Hook#webhook.account_id}
       ,{<<"include_subaccounts">>, Hook#webhook.include_subaccounts}
       ,{<<"include_internal_legs">>, Hook#webhook.include_loopback}
+      ,{<<"version">>, kz_term:to_binary(Hook#webhook.version)}
       ,{<<"custom_data">>, Hook#webhook.custom_data}
       ,{<<"modifiers">>, Hook#webhook.modifiers}
+      ,{<<"security">>, Hook#webhook.security}
       ]).
 
 -spec find_webhooks(kz_term:ne_binary(), kz_term:api_binary()) -> webhooks().
@@ -167,10 +168,18 @@ match_subaccount_webhooks(HookEvent, AccountId) ->
     ets:select(table_id(), MatchSpec).
 
 -spec fire_hooks(kz_json:object(), webhooks()) -> 'ok'.
-fire_hooks(_, []) -> 'ok';
-fire_hooks(JObj, [Hook | Hooks]) ->
-    maybe_fire_hook(JObj, Hook),
-    fire_hooks(JObj, Hooks).
+fire_hooks(JObj, Hooks) ->
+    fire_hooks(JObj, JObj, Hooks).
+
+-spec fire_hooks(kz_json:object(), kz_json:object(), webhooks()) -> 'ok'.
+fire_hooks(_, _, []) -> 'ok';
+fire_hooks(JObj, V2JObj, [#webhook{version = 'v2'} = Hook | Hooks]) ->
+    maybe_fire_hook(maybe_augment_event(Hook, V2JObj), Hook),
+    fire_hooks(JObj, V2JObj, Hooks);
+fire_hooks(JObj, V2JObj, [Hook | Hooks]) ->
+    NewJObj = kz_json:set_value(<<"cluster_id">>, kzd_cluster:id(), JObj),
+    maybe_fire_hook(NewJObj, Hook),
+    fire_hooks(JObj, V2JObj, Hooks).
 
 -spec maybe_fire_hook(kz_json:object(), webhook()) -> 'ok'.
 maybe_fire_hook(JObj, #webhook{modifiers='undefined'}=Hook) ->
@@ -203,8 +212,7 @@ maybe_fire_foldl(Key, Value, {_ShouldFire, JObj}) ->
 -spec fire_hook(kz_json:object(), webhook()) -> 'ok'.
 fire_hook(JObj, #webhook{custom_data = 'undefined'} = Hook) ->
     EventId = kz_binary:rand_hex(5),
-    NewJObj = kz_json:set_value(<<"cluster_id">>, kzd_cluster:id(), JObj),
-    do_fire(Hook, EventId, NewJObj);
+    do_fire(Hook, EventId, JObj);
 fire_hook(JObj, #webhook{custom_data = CustomData} = Hook) ->
     WithoutTypeAction = kz_json:delete_keys([<<"type">>, <<"action">>], CustomData),
     NewJObj = kz_json:merge_jobjs(WithoutTypeAction, JObj),
@@ -485,12 +493,6 @@ hook_id(AccountId, Id) ->
 hook_event(Bin) -> hook_event_lowered(kz_term:to_lower_binary(Bin)).
 
 -spec hook_event_lowered(kz_term:ne_binary()) -> kz_term:ne_binary().
-hook_event_lowered(<<"channel_create">>) -> <<"CHANNEL_CREATE">>;
-hook_event_lowered(<<"channel_answer">>) -> <<"CHANNEL_ANSWER">>;
-hook_event_lowered(<<"channel_destroy">>) -> <<"CHANNEL_DESTROY">>;
-hook_event_lowered(<<"channel_bridge">>) -> <<"CHANNEL_BRIDGE">>;
-hook_event_lowered(<<"channel_hold">>) -> <<"CHANNEL_HOLD">>;
-hook_event_lowered(<<"channel_unhold">>) -> <<"CHANNEL_UNHOLD">>;
 hook_event_lowered(<<"all">>) -> <<"all">>;
 hook_event_lowered(Event) ->
     'true' = lists:member(Event, available_events()),
@@ -664,9 +666,11 @@ jobj_to_rec(Webhook) ->
             ,account_id = kz_doc:account_id(Webhook)
             ,include_subaccounts = kzd_webhooks:include_subaccounts(Webhook)
             ,include_loopback = kzd_webhooks:include_internal_legs(Webhook)
+            ,version = kz_term:to_atom(kzd_webhooks:version(Webhook))
             ,custom_data = kzd_webhooks:custom_data(Webhook)
             ,modifiers = kzd_webhooks:modifiers(Webhook)
             ,format = kzd_webhooks:format(Webhook)
+            ,security = kzd_webhooks:security_settings(Webhook)
             }.
 
 -spec init_webhooks() -> 'ok'.
@@ -751,21 +755,21 @@ enable_account_hooks(Account) ->
                                 ]
                                )
     of
-        {'ok', []} -> io:format("account ~s has no webhooks configured~n", [AccountId]);
+        {'ok', []} -> lager:debug("account ~s has no webhooks configured~n", [AccountId]);
         {'ok', Hooks} -> enable_hooks(Hooks);
-        {'error', _E} -> io:format("failed to load hooks for account ~s: ~p~n", [AccountId, _E])
+        {'error', _E} -> lager:debug("failed to load hooks for account ~s: ~p~n", [AccountId, _E])
     end.
 
 -spec enable_hooks(kz_json:objects()) -> 'ok'.
 enable_hooks(Hooks) ->
     case hooks_to_reenable(Hooks) of
-        [] -> io:format("no hooks to re-enable~n", []);
+        [] -> lager:debug("no hooks to re-enable~n", []);
         Reenable ->
             {'ok', Saved} = kz_datamgr:save_docs(?KZ_WEBHOOKS_DB, Reenable),
             _ = webhooks_disabler:flush_hooks(Reenable),
-            io:format("re-enabled ~p hooks~nIDs: ", [length(Saved)]),
+            lager:debug("re-enabled ~p hooks~nIDs: ", [length(Saved)]),
             Ids = kz_binary:join([kz_doc:id(D) || D <- Saved], <<", ">>),
-            io:format("~s~n", [Ids])
+            lager:debug("~s~n", [Ids])
     end.
 
 -spec hooks_to_reenable(kz_json:objects()) -> kz_json:objects().
@@ -793,7 +797,7 @@ enable_descendant_hooks(Account) ->
                                            ]
                                           );
         {'error', _E} ->
-            io:format("failed to find descendants for account ~s: ~p~n", [AccountId, _E])
+            lager:debug("failed to find descendants for account ~s: ~p~n", [AccountId, _E])
     end.
 
 -spec maybe_enable_descendants_hooks(kz_term:ne_binaries()) -> 'ok'.
@@ -802,7 +806,7 @@ maybe_enable_descendants_hooks(Accounts) ->
 
 -spec maybe_enable_descendant_hooks(kz_term:ne_binary()) -> 'ok'.
 maybe_enable_descendant_hooks(Account) ->
-    io:format("## checking account ~s for hooks to enable ##~n", [Account]),
+    lager:debug("## checking account ~s for hooks to enable ##~n", [Account]),
     enable_account_hooks(Account).
 
 -spec init_metadata(kz_term:ne_binary(), kz_json:object()) -> 'ok'.
@@ -859,3 +863,29 @@ fetch_available_events() ->
             kz_cache:store_local(?CACHE_NAME, ?AVAILABLE_EVENT_KEY, EventIds, CacheProps),
             EventIds
     end.
+
+maybe_augment_event(#webhook{security='undefined'}, V2JObj) ->
+    add_timestamp(V2JObj);
+maybe_augment_event(#webhook{security=Security}, V2JObj) ->
+    maybe_add_hmac(V2JObj, kz_json:get_ne_binary_value(<<"sha256_key">>, Security)).
+
+add_timestamp(V2JObj) ->
+    kz_json:set_value(<<"timestamp">>, kz_time:now_s(), V2JObj).
+
+maybe_add_hmac(V2JObj, 'undefined') ->
+    add_timestamp(V2JObj);
+maybe_add_hmac(V2JObj, SHA256) ->
+    add_hmac(V2JObj, SHA256).
+
+add_hmac(V2JObj, SHA256) ->
+    Timestamp = kz_time:now_s(),
+    DataJSON = kz_json:encode(kz_json:get_json_value(<<"data">>, V2JObj), ['canonical']),
+
+    MAC = crypto:mac('hmac', 'sha256', SHA256
+                    ,<<(kz_term:to_binary(Timestamp))/binary, DataJSON/binary>>
+                    ),
+    kz_json:set_values([{<<"timestamp">>, Timestamp}
+                       ,{<<"hmac">>, base64:encode(MAC)}
+                       ]
+                      ,V2JObj
+                      ).

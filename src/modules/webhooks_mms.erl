@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2023, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -66,6 +66,9 @@ account_bindings(_AccountId) -> [].
 -spec handle_mms(kz_json:object(), kz_term:proplist()) -> 'ok'.
 handle_mms(Payload, _Props) ->
     kz_log:put_callid(Payload),
+
+    EventName = kz_api:event_name(Payload),
+
     'true' = kapi_im:inbound_v(Payload),
     AccountId = kz_im:account_id(Payload),
     case webhooks_util:find_webhooks(?HOOK_NAME, AccountId) of
@@ -73,7 +76,8 @@ handle_mms(Payload, _Props) ->
             lager:debug("no hooks to handle ~s for ~s", [kz_api:event_name(Payload), AccountId]);
         Hooks ->
             Event = format_event(Payload, AccountId),
-            webhooks_util:fire_hooks(Event, Hooks)
+            V2Event = format_v2_event(Payload, EventName),
+            webhooks_util:fire_hooks(Event, V2Event, Hooks)
     end.
 
 %%%=============================================================================
@@ -109,3 +113,15 @@ format_event(Payload, AccountId) ->
       ,{<<"origin">>, kz_im:route_type(Payload)}
       ,{<<"charges">>, kz_im:charges(Payload)}
       ]).
+
+-spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
+          kz_json:object().
+format_v2_event(CallEvent, HookEvent) ->
+    NormJObj = kz_json:normalize_jobj(
+                 kz_api:public_fields(CallEvent)
+                ),
+    Msg = [{<<"action">>, <<"event">>}
+          ,{<<"name">>, HookEvent}
+          ,{<<"data">>, NormJObj}
+          ],
+    kz_json:from_list(Msg).

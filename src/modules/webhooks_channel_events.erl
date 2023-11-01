@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2023, 2600Hz
 %%% Process channel events and send to configured webhooks
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -114,7 +114,7 @@ maybe_handle_channel_event('undefined', HookEvent, CallEvent) ->
     end;
 maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent) ->
     lager:debug("evt ~s for ~s", [HookEvent, AccountId]),
-    case webhooks_util:find_webhooks(HookEvent, AccountId) of
+    case webhooks_util:find_webhooks(kz_term:to_lower_binary(HookEvent), AccountId) of
         [] -> lager:debug("no hooks to handle ~s for ~s", [HookEvent, AccountId]);
         Hooks ->
             maybe_fire_event(AccountId, HookEvent, CallEvent, Hooks)
@@ -123,7 +123,10 @@ maybe_handle_channel_event(<<AccountId/binary>>, <<HookEvent/binary>>, CallEvent
 -spec maybe_fire_event(kz_term:ne_binary(), kz_term:ne_binary(), kz_call_event:payload(), webhooks()) -> 'ok'.
 maybe_fire_event(AccountId, HookEvent, CallEvent, Hooks) ->
     FireAbleHooks = fireable_hooks(CallEvent, Hooks),
-    webhooks_util:fire_hooks(format_event(CallEvent, AccountId, HookEvent), FireAbleHooks).
+    webhooks_util:fire_hooks(format_event(CallEvent, AccountId, HookEvent)
+                            ,format_v2_event(CallEvent, HookEvent)
+                            ,FireAbleHooks
+                            ).
 
 -spec fireable_hooks(kz_call_event:payload(), webhooks()) -> webhooks().
 fireable_hooks(CallEvent, Hooks) ->
@@ -193,7 +196,12 @@ format_event(CallEvent, AccountId, <<"CHANNEL_DESTROY">>) ->
                     ,{<<"ringing_seconds">>, kz_call_event:ringing_seconds(CallEvent)}
                     ,{<<"billing_seconds">>, kz_call_event:billing_seconds(CallEvent)}
                     ]
-                   ).
+                   );
+format_event(CallEvent, AccountId, HookEvent) ->
+    kz_json:set_value(<<"hook_event">>
+                     ,kz_term:to_lower_binary(HookEvent)
+                     ,base_hook_event(CallEvent, AccountId)
+                     ).
 
 -spec base_hook_event(kz_call_event:payload(), kz_term:api_binary()) -> kz_json:object().
 base_hook_event(CallEvent, AccountId) ->
@@ -257,6 +265,18 @@ non_reserved_ccvs(CCVs, Keys) ->
 
 -spec cavs(kz_call_event:payload()) -> kz_term:api_object().
 cavs(CallEvent) -> kz_call_event:custom_application_vars(CallEvent).
+
+-spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
+          kz_json:object().
+format_v2_event(CallEvent, HookEvent) ->
+    NormJObj = kz_json:normalize_jobj(
+                 kz_api:public_fields(CallEvent)
+                ),
+    Msg = [{<<"action">>, <<"event">>}
+          ,{<<"name">>, HookEvent}
+          ,{<<"data">>, NormJObj}
+          ],
+    kz_json:from_list(Msg).
 
 -spec find_account_in_event(kz_call_event:payload()) -> kz_term:api_ne_binary().
 find_account_in_event(CallEvent) ->

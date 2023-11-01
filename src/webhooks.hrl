@@ -9,6 +9,7 @@
 
 -type http_verb() :: 'get' | 'post' | 'put'.
 -type hook_retries() :: 1..5.
+-type version() :: 'v1' | 'v2'.
 
 -record(webhook, {id :: kz_term:api_ne_binary() | '_'
                  ,uri :: kz_term:api_ne_binary() | '_'
@@ -19,9 +20,11 @@
                  ,account_id :: kz_term:api_ne_binary() | '_' | '$1'
                  ,include_subaccounts = 'false' :: boolean() | '_' | '$3'
                  ,include_loopback = 'true' :: boolean() | '_'
+                 ,version = 'v1' :: version() | '_'
                  ,custom_data :: kz_term:api_object() | '_'
                  ,modifiers :: kz_term:api_object() | '_'
                  ,format = 'form-data' :: 'form-data' | 'json' | '_'
+                 ,security :: kz_term:api_object() | '_'
                  }).
 -type webhook() :: #webhook{}.
 -type webhooks() :: [webhook()].

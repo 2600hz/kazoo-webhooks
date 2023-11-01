@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2022, 2600Hz
+%%% @copyright (C) 2010-2023, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -119,19 +119,20 @@ handle_event(DocChange, _Props) ->
     case find_account_id(DocChange) of
         'undefined' -> 'ok';
         AccountId ->
-            handle_account_change(DocChange, AccountId)
+            handle_account_change(EventName, DocChange, AccountId)
     end.
 
--spec handle_account_change(kapi_conf:doc(), kz_term:ne_binary()) -> 'ok'.
-handle_account_change(DocChange, AccountId) ->
-    handle_account_change(DocChange, AccountId, webhooks_util:find_webhooks(?HOOK_NAME, AccountId)).
+-spec handle_account_change(kz_term:ne_binary(), kapi_conf:doc(), kz_term:ne_binary()) -> 'ok'.
+handle_account_change(EventName, DocChange, AccountId) ->
+    handle_account_change(EventName, DocChange, AccountId, webhooks_util:find_webhooks(?HOOK_NAME, AccountId)).
 
-handle_account_change(_DocChange, _AccountId, []) ->
+handle_account_change(_EventName, _DocChange, _AccountId, []) ->
     lager:debug("no hooks to handle ~s(~s) for ~s"
                ,[?HOOK_NAME, kz_api:event_name(_DocChange), _AccountId]
                );
-handle_account_change(DocChange, AccountId, Hooks) ->
+handle_account_change(EventName, DocChange, AccountId, Hooks) ->
     EventJObj = format_event(DocChange, AccountId),
+    V2EventJObj = format_v2_event(DocChange, EventName),
 
     Action = kz_api:event_name(DocChange),
     Type = kapi_conf:get_type(DocChange),
@@ -139,7 +140,7 @@ handle_account_change(DocChange, AccountId, Hooks) ->
     lager:debug("event for action ~s type ~s", [Action, Type]),
 
     Filtered = [Hook || Hook <- Hooks, match_action_type(Hook, Action, Type)],
-    webhooks_util:fire_hooks(EventJObj, Filtered).
+    webhooks_util:fire_hooks(EventJObj, V2EventJObj, Filtered).
 
 -spec match_action_type(webhook(), kz_term:api_binary(), kz_term:api_binary()) -> boolean().
 match_action_type(#webhook{hook_event = ?HOOK_NAME
@@ -247,6 +248,18 @@ default_keys() ->
 maybe_remove_pvt(<<"_", Key/binary>>) -> Key;
 maybe_remove_pvt(<<"pvt_", Key/binary>>) -> Key;
 maybe_remove_pvt(Key) -> Key.
+
+-spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
+          kz_json:object().
+format_v2_event(CallEvent, HookEvent) ->
+    NormJObj = kz_json:normalize_jobj(
+                 kz_api:public_fields(CallEvent)
+                ),
+    Msg = [{<<"action">>, <<"event">>}
+          ,{<<"name">>, HookEvent}
+          ,{<<"data">>, NormJObj}
+          ],
+    kz_json:from_list(Msg).
 
 %%------------------------------------------------------------------------------
 %% @doc
