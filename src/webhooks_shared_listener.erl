@@ -14,7 +14,7 @@
 -export([start_link/0
         ,hooks_configured/0
         ,hooks_configured/1
-        ,handle_doc_type_update/2
+        ,handle_reenable_req/2
 
         ,add_account_bindings/0
         ,remove_account_bindings/0
@@ -38,14 +38,10 @@
 -type state() :: #state{}.
 
 %% responsible for reloading auto-disabled webhooks
--define(BINDINGS, [{'conf', [{'restrict_to', ['doc_type_updates']}
-                            ,{'type', kzd_webhooks:type()}
-                            ]
-                   }
-                  ]).
+-define(BINDINGS, [{'webhooks', []}]).
 
--define(RESPONDERS, [{{?MODULE, 'handle_doc_type_update'}
-                     ,[{<<"configuration">>, <<"doc_type_update">>}]
+-define(RESPONDERS, [{{?MODULE, 'handle_reenable_req'}
+                     ,[{<<"webhooks">>, <<"reenable_req">>}]
                      }
                     ]).
 -define(QUEUE_NAME, <<"webhooks_shared_listener">>).
@@ -117,29 +113,25 @@ load_module_fold(Module, {Bindings, Responders}=Acc) ->
             Acc
     end.
 
--spec handle_doc_type_update(kz_json:object(), kz_term:proplist()) -> 'ok'.
-handle_doc_type_update(JObj, _Props) ->
-    'true' = kapi_conf:doc_type_update_v(JObj),
+-spec handle_reenable_req(kz_json:object(), kz_term:proplist()) -> 'ok'.
+handle_reenable_req(JObj, _Props) ->
+    'true' = kapi_webhooks:reenable_req_v(JObj),
     kz_log:put_callid(JObj),
 
-    lager:debug("re-enabling hooks for ~s: ~s"
-               ,[kapi_conf:get_account_id(JObj)
-                ,kapi_conf:get_action(JObj)
-                ]),
-    webhooks_util:reenable(kapi_conf:get_account_id(JObj)
-                          ,kapi_conf:get_action(JObj)
-                          ),
+    AccountId = kz_json:get_ne_binary_value(<<"Account-ID">>, JObj),
+    Target = kz_json:get_ne_binary_value(<<"Target">>, JObj),
+
+    lager:debug("re-enabling hooks for ~s: ~s", [AccountId, Target]),
+    webhooks_util:reenable(AccountId, Target),
 
     ServerId = kz_api:server_id(JObj),
     lager:debug("publishing resp to ~s", [ServerId]),
-    kz_amqp_worker:cast([{<<"status">>, <<"success">>}
-                        ,{<<"Event-Category">>, <<"configuration">>}
-                        ,{<<"Event-Name">>, <<"doc_type_updated">>}
-                        ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
-                        | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
-                        ]
-                       ,fun(P) -> kapi_self:publish_message(ServerId, P) end
-                       ).
+    Resp = [{<<"Status">>, <<"success">>}
+           ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
+           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+           ],
+    kz_amqp_worker:cast(Resp, fun(P) -> kapi_webhooks:publish_reenable_resp(ServerId, P) end),
+    'ok'.
 
 -spec hooks_configured() -> 'ok'.
 hooks_configured() ->

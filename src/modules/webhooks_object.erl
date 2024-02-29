@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2024, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -106,33 +106,26 @@ account_bindings(_AccountId) -> [].
 -spec handle_event(kapi_conf:doc(), kz_term:proplist()) -> 'ok'.
 handle_event(DocChange, _Props) ->
     kz_log:put_callid(DocChange),
-
-    EventName = kz_api:event_name(DocChange),
-
-    case kapi_definition:name(kapi_conf:api_definition(<<"doc_type_update">>)) of
-        EventName ->
-            'true' = kapi_conf:doc_type_update_v(DocChange);
-        _ ->
-            'true' = kapi_conf:doc_update_v(DocChange)
-    end,
+    'true' = kapi_conf:doc_update_v(DocChange),
 
     case find_account_id(DocChange) of
         'undefined' -> 'ok';
-        AccountId ->
-            handle_account_change(EventName, DocChange, AccountId)
+        AccountId -> handle_account_change(DocChange, AccountId)
     end.
 
--spec handle_account_change(kz_term:ne_binary(), kapi_conf:doc(), kz_term:ne_binary()) -> 'ok'.
-handle_account_change(EventName, DocChange, AccountId) ->
-    handle_account_change(EventName, DocChange, AccountId, webhooks_util:find_webhooks(?HOOK_NAME, AccountId)).
+-spec handle_account_change(kapi_conf:doc(), kz_term:ne_binary()) -> 'ok'.
+handle_account_change(DocChange, AccountId) ->
+    handle_account_change(DocChange, AccountId, webhooks_util:find_webhooks(?HOOK_NAME, AccountId)).
 
-handle_account_change(_EventName, _DocChange, _AccountId, []) ->
+-spec handle_account_change(kapi_conf:doc(), kz_term:ne_binary(), webhooks()) -> 'ok'.
+handle_account_change(_DocChange, _AccountId, []) ->
     lager:debug("no hooks to handle ~s(~s) for ~s"
                ,[?HOOK_NAME, kz_api:event_name(_DocChange), _AccountId]
-               );
-handle_account_change(EventName, DocChange, AccountId, Hooks) ->
+               ),
+    'ok';
+handle_account_change(DocChange, AccountId, Hooks) ->
     EventJObj = format_event(DocChange, AccountId),
-    V2EventJObj = format_v2_event(DocChange, EventName),
+    V2EventJObj = format_v2_event(DocChange),
 
     Action = kz_api:event_name(DocChange),
     Type = kapi_conf:get_type(DocChange),
@@ -249,14 +242,11 @@ maybe_remove_pvt(<<"_", Key/binary>>) -> Key;
 maybe_remove_pvt(<<"pvt_", Key/binary>>) -> Key;
 maybe_remove_pvt(Key) -> Key.
 
--spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
-          kz_json:object().
-format_v2_event(CallEvent, HookEvent) ->
-    NormJObj = kz_json:normalize_jobj(
-                 kz_api:public_fields(CallEvent)
-                ),
+-spec format_v2_event(kapi_conf:doc()) -> kz_json:object().
+format_v2_event(Event) ->
+    NormJObj = kz_json:normalize_jobj(kz_api:public_fields(Event)),
     Msg = [{<<"action">>, <<"event">>}
-          ,{<<"name">>, HookEvent}
+          ,{<<"name">>, kz_api:event_name(Event)}
           ,{<<"data">>, NormJObj}
           ],
     kz_json:from_list(Msg).
