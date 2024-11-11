@@ -1,6 +1,6 @@
 # Notification events
 
-This events will fire when a notification event is triggered in Kazoo. These are the same events as Email notifications you get. They also processed by Teletype application to send Email and their Email templates are configurable within Branding application in UI.
+This events will fire when a notification event is triggered in {% BRAND_NAME %}. These are the same events as Email notifications you get. They also proccessed by Teletype application to send Email and their Email templates are configurable within Branding application in UI.
 
 These events _may_ have some common fields which are explained in the next section.
 
@@ -19,7 +19,7 @@ Please do note that most of the fields should be present on the payload, but the
 
 ### Required Fields
 
-Notifications events are basically AMQP message which triggred by some application in Kazoo. So their payload always have the Kazoo standard AMQP fields:
+Notifications events are basically AMQP message which triggred by some application in {% BRAND_NAME %}. So their payload always have the {% BRAND_NAME %} standard AMQP fields:
 
 * `app_name`: The application's name where this event was triggred
 * `app_version`: The application's version where this event was triggred
@@ -558,7 +558,7 @@ This event is triggered to alert the system administrators.
 
 This event is triggered when an account automatic top-up is attempted.
 
-Please note since Kazoo version 4.3 underlying billing engine is re-written and this event is not sent anymore. Instead you would get a transaction event instead.
+Please note since {% BRAND_NAME %} version 4.3 underlying billing engine is re-written and this event is not sent anymore. Instead you would get a transaction event instead.
 
 ### Possible fields
 

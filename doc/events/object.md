@@ -1,6 +1,6 @@
 # Object (JSON Object) change events
 
-Triggers when objects (docs) in the database are created, modified, or deleted.
+Triggers when certain objects (docs) in the database are created, modified, or deleted.
 
 ## Info
 
@@ -75,6 +75,7 @@ a document update request.
   }
 }
 ```
+### System Config
 
 It is also possible to include data from the document on the webhook via system_config.
 
