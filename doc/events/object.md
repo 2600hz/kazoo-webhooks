@@ -1,6 +1,6 @@
 # Object (JSON Object) change events
 
-Triggers when objects (like JSON document objects) of certain types in Kazoo are changed.
+Triggers when objects (like JSON document objects) of certain types in {% BRAND_NAME %} are changed.
 
 ## Info
 
