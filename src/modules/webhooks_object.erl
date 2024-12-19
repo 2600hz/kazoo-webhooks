@@ -27,7 +27,7 @@
 -define(ID, kz_term:to_binary(?MODULE)).
 -define(HOOK_NAME, <<"object">>).
 -define(NAME, <<"Object">>).
--define(DESC, <<"Receive notifications when objects (like JSON document objects) in Kazoo are changed">>).
+-define(DESC, <<"Receive notifications when objects (like JSON document objects) in 2600Hz are changed">>).
 
 -define(OBJECT_TYPES
        ,kapps_config:get(?APP_NAME, <<"object_types">>, ?DOC_TYPES)
