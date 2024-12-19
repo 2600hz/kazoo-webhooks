@@ -455,7 +455,7 @@ debug_resp({'error', E}, Debug, Retries) ->
                   end,
     kz_json:from_list(
       [{<<"result">>, <<"failure">>}
-      ,{<<"reason">>, <<"kazoo http client error">>}
+      ,{<<"reason">>, <<"http client error">>}
       ,{<<"retries">>, Retries}
       ,{<<"retries_left">>, RetriesLeft}
       ,{<<"client_error">>, Error}

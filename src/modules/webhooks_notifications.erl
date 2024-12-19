@@ -23,7 +23,7 @@
 -define(ID, kz_term:to_binary(?MODULE)).
 -define(HOOK_NAME, <<"notifications">>).
 -define(NAME, <<"Notifications Webhook">>).
--define(DESC, <<"Fire a webhook when a notification event is triggered in Kazoo">>).
+-define(DESC, <<"Fire a webhook when a notification event is triggered in 2600Hz">>).
 
 -define(TYPE_ALL
        ,kz_json:from_list([{<<"friendly_name">>, <<"All">>}
