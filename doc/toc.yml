@@ -1,4 +1,4 @@
-  # - 'Webhooks: HTTP events from KAZOO to you':
+  # - 'Webhooks: HTTP events from {% BRAND_NAME %} to you':
 - 'doc/README.md'
 - 'doc/disabler.md'
 - 'doc/events/channels.md'
