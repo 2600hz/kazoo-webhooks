@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2025, 2600Hz
 %%%
 %%%
 %%% @author Peter Defebvre
@@ -103,9 +103,7 @@ format(CallEvent) ->
 -spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
           kz_json:object().
 format_v2_event(CallEvent, HookEvent) ->
-    NormJObj = kz_json:normalize_jobj(
-                 kz_api:public_fields(CallEvent)
-                ),
+    NormJObj = webhooks_util:sanitize_event(CallEvent),
     Msg = [{<<"action">>, <<"event">>}
           ,{<<"name">>, HookEvent}
           ,{<<"data">>, NormJObj}

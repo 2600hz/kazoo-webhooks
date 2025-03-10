@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2024, 2600Hz
+%%% @copyright (C) 2010-2025, 2600Hz
 %%%
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -244,12 +244,101 @@ maybe_remove_pvt(Key) -> Key.
 
 -spec format_v2_event(kapi_conf:doc()) -> kz_json:object().
 format_v2_event(Event) ->
-    NormJObj = kz_json:normalize_jobj(kz_api:public_fields(Event)),
-    Msg = [{<<"action">>, <<"event">>}
-          ,{<<"name">>, kz_api:event_name(Event)}
-          ,{<<"data">>, NormJObj}
-          ],
+    Type = kz_api:event_name(Event),
+    Msg =   [{<<"action">>, <<"event">>}
+            ,{<<"name">>, Type}
+            ,{<<"data">>, maybe_include_full_doc(Event, Type)}
+            ],
     kz_json:from_list(Msg).
+
+-spec maybe_include_full_doc(kapi_conf:doc(), kz_term:api_binary()) -> kz_json:object().
+maybe_include_full_doc(Event, ?DOC_DELETED) ->
+    kz_json:set_value(<<"metadata">>
+                     ,get_event_metadata(Event)
+                     ,webhooks_util:sanitize_event(Event)
+                     );
+maybe_include_full_doc(Event, Type) ->
+    include_full_doc(Event, Type).
+
+- spec include_full_doc(kapi_conf:doc(), kz_term:api_binary()) -> kz_json:object().
+include_full_doc(Event, Type) ->
+    case kz_datamgr:open_doc(kapi_conf:get_database(Event), kapi_conf:get_id(Event)) of
+        {'error', Error} ->
+            lager:debug("doc from ~s event failed to open with error ~p responding without doc", [Type, Error]),
+            kz_json:set_value(<<"metadata">>
+                             ,get_event_metadata(Event)
+                             ,webhooks_util:sanitize_event(Event)
+                             );
+        {'ok', Doc} ->
+            Prop = [{<<"doc">>, kz_doc:public_fields(Doc)}
+                   ,{<<"metadata">>, get_doc_metadata(Event, Doc)}
+                   ],
+            kz_json:set_values(Prop, webhooks_util:sanitize_event(Event))
+    end.
+
+-spec get_doc_metadata(kapi_conf:doc(), kz_doc:doc()) -> kz_doc:doc().
+get_doc_metadata(Event, Doc) ->
+    Props = maybe_add_extra_metadata(Event, Doc, kapi_conf:get_type(Event)),
+    kz_json:set_values(Props, kz_doc:read_only(Doc)).
+
+-spec maybe_add_extra_metadata(kapi_conf:doc(), kz_doc:doc(), kz_term:ne_binary()) -> kz_json:json_proplist().
+maybe_add_extra_metadata(Event, AccountDoc, <<"account">>) ->
+    [{<<"wnm_allow_additions">>, kzd_accounts:allow_number_additions(AccountDoc)}
+    ,{<<"enabled">>, kzd_accounts:is_enabled(AccountDoc)}
+    ,{<<"is_reseller">>, kz_services_reseller:is_reseller(kzd_accounts:id(AccountDoc))}
+    ,{<<"reseller_id">>, kz_services_reseller:get_id(kzd_accounts:id(AccountDoc))}
+    ,{<<"billing_mode">>, get_billing_mode(kapi_conf:get_account_id(Event), AccountDoc)}
+    ,{<<"trial_time_left">>, kzd_accounts:trial_expiration(AccountDoc)}
+    ,{<<"notification_preference">>, kzd_accounts:notification_preference(AccountDoc)}
+    ];
+maybe_add_extra_metadata(_Event, FaxBoxDoc, <<"faxbox">>) ->
+    maybe_custom_smtp_address(FaxBoxDoc) ++ maybe_smtp_email_address(FaxBoxDoc);
+maybe_add_extra_metadata(_Event, UserDoc, <<"user">>) ->
+    [{<<"password_expiration_timestamp">>, kzd_users:password_expiration_timestamp(UserDoc)}
+    ,{<<"is_password_expired">>, kzd_users:is_password_expired(UserDoc)}
+    ];
+maybe_add_extra_metadata(_Event, _Doc, _DocType) ->
+    [].
+
+-spec get_billing_mode(kz_term:api_binary(), kzd_accounts:doc()) -> kz_term:ne_binary().
+get_billing_mode(EventAccountId, Doc) ->
+    {'ok', MasterAccountId} = kapps_util:get_master_account_id(),
+    case kz_services_reseller:get_id(kzd_accounts:id(Doc)) of
+        EventAccountId  -> <<"limits_only">>;
+        MasterAccountId -> <<"normal">>;
+        _               -> <<"manual">>
+    end.
+
+-spec maybe_custom_smtp_address(kzd_faxbox:doc()) -> kz_json:json_proplist().
+maybe_custom_smtp_address(Doc) ->
+    case kz_json:get_value(<<"pvt_smtp_email_address">>, Doc) of
+        'undefined' -> [];
+        Value -> [{<<"smtp_email_address">>, Value}]
+    end.
+
+-spec maybe_smtp_email_address(kzd_faxbox:doc()) -> kz_json:json_proplist().
+maybe_smtp_email_address(Doc) ->
+    case kzd_faxbox:custom_smtp_email_address(Doc) of
+        'undefined' -> [];
+        Value   -> [{<<"custom_smtp_email_address">>, Value}]
+    end.
+
+-spec get_event_metadata(kapi_conf:doc()) -> kz_json:object().
+get_event_metadata(Event) ->
+    kz_json:from_list([{<<"id">>, kapi_conf:get_id(Event)}
+                      ,{<<"created">>, kz_json:get_value(<<"Date-Created">>, Event)}
+                      ,{<<"modified">>, kz_json:get_value(<<"Date-Modified">>, Event)}
+                      | maybe_deleted(Event)
+                      ]).
+
+-spec maybe_deleted(kapi_conf:doc()) -> kz_json:json_proplist().
+maybe_deleted(Event) ->
+    case kz_api:event_name(Event) =:= ?DOC_DELETED
+        orelse kapi_conf:get_is_soft_deleted(Event)
+    of
+        'false' -> [];
+        'true' -> [{<<"deleted">>, 'true'}]
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc

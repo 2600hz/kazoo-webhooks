@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2025, 2600Hz
 %%% Process cdr events and send to configured webhooks
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -133,9 +133,7 @@ ccv(CDREvent, Key, Default) ->
 -spec format_v2_event(kz_call_event:payload(), kz_term:ne_binary()) ->
           kz_json:object().
 format_v2_event(CDREvent, HookEvent) ->
-    NormJObj = kz_json:normalize_jobj(
-                 kz_api:public_fields(CDREvent)
-                ),
+    NormJObj = webhooks_util:sanitize_event(CDREvent),
     Msg = [{<<"action">>, <<"event">>}
           ,{<<"name">>, HookEvent}
           ,{<<"data">>, NormJObj}
