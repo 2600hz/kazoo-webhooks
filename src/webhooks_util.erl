@@ -47,6 +47,8 @@
         ,gift_data/0
         ]).
 
+-export([sanitize_event/1]).
+
 -include("webhooks.hrl").
 
 -define(TABLE, 'webhooks_listener').
@@ -71,6 +73,23 @@
        ).
 
 -define(AVAILABLE_EVENT_KEY, 'available_events').
+
+
+-define(PRIVATE_AMQP_FIELDS, [<<"Node">>
+                             ,<<"Message-ID">>
+                             ,<<"Server-ID">>
+                             ,<<"Origin-Cache">>
+                             ,<<"App-Name">>
+                             ,<<"App-Version">>
+                             ,<<"Event-Name">>
+                             ,<<"Event-Category">>
+                             ,<<"Msg-ID">>
+                             ]).
+
+-define(SENSITIVE_AMQP_FIELDS, [<<"Password">>
+                               ]).
+
+-define(SENSITIVE_EVENT_FIELDS, ?PRIVATE_AMQP_FIELDS ++ ?SENSITIVE_AMQP_FIELDS).
 
 -spec table_id() -> ?TABLE.
 table_id() -> ?TABLE.
@@ -229,7 +248,6 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
        ,JObj
        ) ->
     lager:debug("sending hook ~s(~s) with interaction id ~s via 'get' (retries ~b): ~s", [_HookEvent, _HookId, EventId, Retries, URI]),
-
     Url = kz_term:to_list(
             list_to_binary([kz_term:to_binary(URI)
                            ,kz_term:to_binary([$? | kz_http_util:json_to_querystring(JObj)])
@@ -253,7 +271,6 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
     lager:debug("sending hook ~s(~s) with interaction id ~s via '~s' (retries ~b): ~s"
                ,[_HookEvent, _HookId, EventId, Verb, Retries, URI]
                ),
-
     Body = kz_http_util:json_to_querystring(JObj),
     Headers = [{"Content-Type", "application/x-www-form-urlencoded"}
               | ?HTTP_REQ_HEADERS(Hook)
@@ -889,3 +906,11 @@ add_hmac(V2JObj, SHA256) ->
                     ,<<(kz_term:to_binary(Timestamp))/binary, DataJSON/binary>>
                     ),
     kz_json:set_value(<<"hmac">>, base64:encode(MAC), V2JObj).
+
+-spec sanitize_event(kapi_conf:doc()) -> kz_json:object().
+sanitize_event(Event) ->
+    kz_json:normalize_jobj(
+      kz_api:public_fields(
+        kz_json:delete_keys(?SENSITIVE_EVENT_FIELDS, Event)
+       )
+     ).
