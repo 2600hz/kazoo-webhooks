@@ -8,6 +8,7 @@
         ]
     },
     "language": "javascript",
+    "autoupdate": false,
     "views": {
         "webhook_meta_listing": {
             "map": [
