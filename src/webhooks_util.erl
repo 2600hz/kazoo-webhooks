@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2023, 2600Hz
+%%% @copyright (C) 2013-2025, 2600Hz
 %%% @doc
 %%% @author Peter Defebvre
 %%%
@@ -865,15 +865,19 @@ fetch_available_events() ->
     end.
 
 maybe_augment_event(#webhook{security='undefined'}, V2JObj) ->
-    add_timestamp(V2JObj);
+    add_v2_generic(V2JObj);
 maybe_augment_event(#webhook{security=Security}, V2JObj) ->
-    maybe_add_hmac(V2JObj, kz_json:get_ne_binary_value(<<"sha256_key">>, Security)).
+    maybe_add_hmac(add_v2_generic(V2JObj), kz_json:get_ne_binary_value(<<"sha256_key">>, Security)).
 
-add_timestamp(V2JObj) ->
-    kz_json:set_value(<<"timestamp">>, kz_time:now_s(), V2JObj).
+add_v2_generic(V2JObj) ->
+    kz_json:set_values([{<<"timestamp">>, kz_time:now_s()}
+                        %% ,{<<"cluster_id">>, kzd_cluster:id()} %% not including for now
+                       ]
+                      ,V2JObj
+                      ).
 
 maybe_add_hmac(V2JObj, 'undefined') ->
-    add_timestamp(V2JObj);
+    V2JObj;
 maybe_add_hmac(V2JObj, SHA256) ->
     add_hmac(V2JObj, SHA256).
 
@@ -884,8 +888,4 @@ add_hmac(V2JObj, SHA256) ->
     MAC = crypto:mac('hmac', 'sha256', SHA256
                     ,<<(kz_term:to_binary(Timestamp))/binary, DataJSON/binary>>
                     ),
-    kz_json:set_values([{<<"timestamp">>, Timestamp}
-                       ,{<<"hmac">>, base64:encode(MAC)}
-                       ]
-                      ,V2JObj
-                      ).
+    kz_json:set_value(<<"hmac">>, base64:encode(MAC), V2JObj).
