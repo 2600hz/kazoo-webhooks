@@ -1,8 +1,10 @@
   # - 'Webhooks: HTTP events from {% BRAND_NAME %} to you':
 - 'doc/README.md'
-- 'doc/disabler.md'
-- 'doc/events/channels.md'
-- 'doc/events/notifications.md'
-- 'doc/events/object.md'
-- 'doc/events/parking.md'
+- "Events":
+  - 'doc/disabler.md'
+  - 'doc/events/channels.md'
+  - 'doc/events/notifications.md'
+  - 'doc/events/object.md'
+  - 'doc/events/parking.md'
+  - 'doc/events/parking.md'
 # - 'doc/maintenance.md'
