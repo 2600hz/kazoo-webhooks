@@ -5,7 +5,7 @@ When this stream connection is successfully established, a `stream_start` event 
 
 If the stream stops, or the call is hangup or the connection failed to disconnected for any reason, a `stream_stop` event will be fired.
 
-You can use this webhook to invoking a HTTP request hook into your application when these events are fired.
+You can use this hook event to invoking an HTTP request hook into your application when these events are get fired by Pivot.
 
 ## Webhook Modifiers
 
@@ -13,12 +13,11 @@ _None._
 
 ## Webhook Custom Data
 
-Stream webhook has  custom data you may use when creating or updating a hook.
+Stream webhook has custom data you may use when creating or updating a hook.
 
 | Key    |  Description                                                                                                                                                                                                                                     |
 |--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `type` | The Stream type to receive. ossible values are:<br><dl><dt>`all`</dt><dd>Sends any Stream event</dd><dt>`stream_start`</dt><dd>Only send event when a stream starts</dd><dt>`stream_stop`</dt><dd>Only send event when a stream stopped</dd><dl> |
-|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 ## Stream start hook event
 
@@ -37,7 +36,6 @@ The subscribed events will send this event message with body with the following 
 | `event_name`     | Always set to `stream_start`                |
 | `stream_id`      | The unique Id of the stream                 |
 | `stream_name`    | The unique name of the stream               |
-|------------------|---------------------------------------------|
 
 ## Stream Stop
 
@@ -57,4 +55,3 @@ The subscribed events will send this event message with body with the following 
 | `reason`         | The reason the stream is stopped                                                                                                        |
 | `stream_id`      | The unique Id of the stream, if it is known. May be missing if the stream failed before initialization                                  |
 | `stream_name`    | The unique name of the stream, if it is known. May be missing if the stream failed before initialization                                |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
