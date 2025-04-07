@@ -127,12 +127,16 @@ handle_account_notification(Notification, EventName) ->
                                ,webhooks_util:find_webhooks(?HOOK_NAME, AccountId)
                                ).
 
-handle_account_notification(Notification, ?ACCOUNT_DELETED=EventName, AccountId, []) ->
-    Parent = kz_json:get_json_value(<<"Parent-ID">>, Notification),
-    lager:info("Cannot get hooks from deleted Account, searching in ~s", [Parent]),
-    handle_account_notification(Notification, EventName, AccountId
-                               ,webhooks_util:find_webhooks(?HOOK_NAME, Parent)
-                               );
+handle_account_notification(Notification, ?ACCOUNT_DELETED=EventName, AccountId, []=Hooks) ->
+    case kz_json:get_json_value(<<"Parent-ID">>, Notification) of
+        'undefined' -> 
+            handle_account_notification(Notification, EventName, AccountId, Hooks);
+        Parent -> kz_json:get_json_value(<<"Parent-ID">>, Notification),
+            lager:info("Cannot get hooks from deleted Account, searching in ~s", [Parent]),
+            handle_account_notification(Notification, EventName, AccountId
+                                       ,webhooks_util:find_webhooks(?HOOK_NAME, Parent)
+                                       )
+    end;
 
 handle_account_notification(_Notification, _EventName, _AccountId, []) ->
     lager:debug("no hooks to handle ~s for ~s", [_EventName, _AccountId]);
