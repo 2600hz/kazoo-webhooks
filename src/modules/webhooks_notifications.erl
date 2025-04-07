@@ -129,7 +129,7 @@ handle_account_notification(Notification, EventName) ->
 
 handle_account_notification(Notification, ?ACCOUNT_DELETED=EventName, AccountId, []) ->
     Parent = kz_json:get_json_value(<<"Parent-ID">>, Notification),
-    lager:info("Cannot get deleted Account, searching in ~s", [Parent]),
+    lager:info("Cannot get hooks from deleted Account, searching in ~s", [Parent]),
     handle_account_notification(Notification, EventName, AccountId
                                ,webhooks_util:find_webhooks(?HOOK_NAME, Parent)
                                );
