@@ -269,6 +269,18 @@ This event is triggered when an end user creates a new account.
 * `account_realm`
 * `event_name`: `new_account`
 
+## Account Deleted: account_deleted
+
+This event is triggered when an account is deleted.
+
+* `account_api_key`
+* `account_db`
+* `account_id`
+* `account_name`
+* `account_realm`
+* `parent_id`
+* `event_name`: `account_deleted`
+
 ## New User: new_user
 
 This event is triggered when an end user creates a new user.
