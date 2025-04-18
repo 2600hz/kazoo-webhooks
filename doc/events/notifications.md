@@ -1,10 +1,10 @@
 # Notification events
 
-This events will fire when a notification event is triggered in Kazoo. These are the same events as Email notifications you get. They also proccessed by Teletype application to send Email and their Email templates are configurable within Branding application in UI.
+This events will fire when a notification event is triggered in Kazoo. These are the same events as Email notifications you get. They also processed by Teletype application to send Email and their Email templates are configurable within Branding application in UI.
 
 These events usally _may_ have some common fields which are explained in the next section.
 
-Please do note that most of the fields should be present on the payload, but they could also be missing based on the available information at the time of the event was occured.
+Please do note that most of the fields should be present on the payload, but they could also be missing based on the available information at the time of the event was occurred.
 
 ## Info
 
