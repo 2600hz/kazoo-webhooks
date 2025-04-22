@@ -53,23 +53,23 @@ a document update request.
 
 ```json
 {
-  'action': 'event',
-  'name': 'doc_created',
-  'type': 'user',
-  'is_soft_deleted': 'false',
-  'account_id': 'c7612246de30adab3a1371274297eff7',
-  'database': 'account%2Fc7%2F61%2F2246de30adab3a1371274297eff7',
-  'id': 'a60063fda11c56b8a150761a1a8e67fd',
-  'event_name': ...
-  'event_category': ...
-  'timestamp': '63907712980'
-  'data': {
-    'metadata': {
-      'created': '63907712980',
-      'modified': ...
+  "action": "event",
+  "name": "doc_created",
+  "type": "user",
+  "is_soft_deleted": false,
+  "account_id": "c7612246de30adab3a1371274297eff7",
+  "database": "account%2Fc7%2F61%2F2246de30adab3a1371274297eff7",
+  "id": "a60063fda11c56b8a150761a1a8e67fd",
+  "event_name": ...
+  "event_category": ...
+  "timestamp": "63907712980"
+  "data": {
+    "metadata": {
+      "created": "63907712980",
+      "modified": ...
       ... //Additional metadata when it would be present in a response from the REST API
     },
-    'doc': {
+    "doc": {
       // public fields of the modified doc.
     }
   }
@@ -80,7 +80,7 @@ It is also possible to include data from the document on the webhook via system_
 
 In the `webhooks.object` document, set `include_fields.{DOC_TYPE}` to the list of JSON keys to read from the document.
 
-For instance, if you want to include a user's first/last name, set `"include_fields.user":["first_name", "last_name"]`.
+For instance, if you want to include a user"s first/last name, set `"include_fields.user":["first_name", "last_name"]`.
 
 The webhook payload received will then look something like:
 
