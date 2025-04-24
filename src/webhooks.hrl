@@ -14,6 +14,7 @@
 -record(webhook, {id :: kz_term:api_ne_binary() | '_'
                  ,uri :: kz_term:api_ne_binary() | '_'
                  ,http_verb = 'get' :: http_verb() | '_'
+                 ,custom_request_headers :: kz_term:api_object() | '_'
                  ,hook_event :: kz_term:api_ne_binary() | '_' | '$1' | '$2'
                  ,hook_id :: kz_term:api_ne_binary() | '_'
                  ,retries = 3 :: hook_retries() | '_'
