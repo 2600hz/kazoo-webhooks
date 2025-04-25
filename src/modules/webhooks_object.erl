@@ -237,7 +237,7 @@ match_action_type(_DataAction, _EventAction, _DataType, _EventType) ->
 %%------------------------------------------------------------------------------
 -spec is_account_terminus(kapi_conf:doc()) -> boolean().
 is_account_terminus(DocChange) ->
-    case {kz_api:event_name(DocChange), kapi_conf:get_type(DocChange)} of 
+    case {kz_api:event_name(DocChange), kapi_conf:get_type(DocChange)} of
         {<<"doc_deleted">>, <<"account">>} -> 'true';
         {_,_} -> 'false'
     end.
