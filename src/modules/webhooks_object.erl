@@ -92,16 +92,15 @@ bindings() ->
     ,{'notifications', [{'restrict_to', ['account_deleted']}]}
     ].
 
-
 -spec responders() -> listener_utils:responder_start_params().
 responders() ->
     [{{?MODULE, 'handle_event'}
      ,[{<<"configuration">>, <<"*">>}]
      }
     ,{{?MODULE, 'handle_account_notif'}
-     ,[{<<"notification">>, <<"*">>}]
+     ,[{<<"notification">>, <<"account_deleted">>}]
      }
-    ].    
+    ].
 
 %%------------------------------------------------------------------------------
 %% @doc
