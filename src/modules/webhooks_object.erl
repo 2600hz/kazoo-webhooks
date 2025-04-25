@@ -86,7 +86,7 @@ init() ->
 bindings_and_responders() ->
     {bindings(), responders()}.
 
-    -spec bindings() -> gen_listener:bindings().
+-spec bindings() -> gen_listener:bindings().
 bindings() ->
     [{'conf', [{'restrict_to', ['doc_updates']}]}
     ,{'notifications', [{'restrict_to', ['account_deleted']}]}
@@ -119,26 +119,30 @@ handle_account_notif(Notification, _Props) ->
     'true' = Validate(Notification),
 
     AccountId = kapi_notifications:account_id(Notification),
-    lager:info("searching for hook ~s(~s) for account ~s", [EventName, ?HOOK_NAME, AccountId]),
+    lager:info("hijacked ~s(notification) searching for hook ~s for account ~s", [EventName, ?HOOK_NAME, AccountId]),
     case webhooks_util:find_webhooks(?HOOK_NAME, AccountId) of
         [] ->
             ParentId = kz_json:get_ne_binary_value(<<"Parent-ID">>, Notification),
             lager:info("cannot get hooks from deleted Account, searching in parent ~s", [ParentId]),
             handle_account_notif(Notification, AccountId
-                                       ,webhooks_util:find_webhooks(?HOOK_NAME, ParentId)
-                                       );
+                                ,webhooks_util:find_webhooks(?HOOK_NAME, ParentId)
+                                );
         Hooks ->
             handle_account_notif(Notification, AccountId
-                                       ,Hooks
-                                       )
+                                ,Hooks
+                                )
     end.
 
 
 -spec handle_account_notif(kapi_notifications:doc(), kz_term:ne_binary(), webhooks()) -> 'ok'.
+handle_account_notif(_Notification, _AccountId, []) ->
+    lager:debug("hijacked ~s no hooks to handle ~s(~s) for ~s"
+               ,[kz_api:event_name(_Notification), ?HOOK_NAME, ?DOC_DELETED, _AccountId]
+               );
 handle_account_notif(Notification, _AccountId, Hooks) ->
     EventJobj = format_account_deleted(Notification),
-    Action = <<"doc_update">>,
-    Type = <<"doc_deleted">>,
+    Action = <<"doc_deleted">>,
+    Type = <<"account">>,
     NotifName =  kz_api:event_name(Notification),
 
     lager:debug("event for action ~s type ~s, hijacked from notification ~s", [Action, Type, NotifName]),
@@ -235,7 +239,7 @@ match_action_type(_DataAction, _EventAction, _DataType, _EventType) ->
 -spec is_account_terminus(kapi_conf:doc()) -> boolean().
 is_account_terminus(DocChange) ->
     case {kz_api:event_name(DocChange), kapi_conf:get_type(DocChange)} of 
-        {<<"doc_deleted">>, 'account'} -> 'true';
+        {<<"doc_deleted">>, <<"account">>} -> 'true';
         {_,_} -> 'false'
     end.
 
@@ -255,9 +259,9 @@ format_account_deleted(Notification) ->
 -spec account_deleted_doc(kapi_notifications:doc()) -> kz_doc:doc().
 account_deleted_doc(Notification) ->
     EventDoc = kz_json:get_ne_json_value(<<"Doc">>, Notification),
-    case kz_datamgr:open_cache_doc(<<"accounts">>, kz_doc:id(EventDoc)) of
+    case kzd_accounts:fetch(kapi_notifications:account_id(Notification), 'accounts') of
         {'error', Error} ->
-            lager:debug("doc from hijacked notification event failed to open with error ~p using incomplete doc", [Error]),
+            lager:debug("doc from hijacked notification event failed to open with error ~p, using incomplete doc", [Error]),
             kz_doc:set_deleted(EventDoc);
         {'ok', FetchedDoc} ->
             kz_json:merge(EventDoc, FetchedDoc)
@@ -270,16 +274,15 @@ account_deleted_metadata(Doc) ->
 
 -spec account_deleted_event_data(kz_doc:doc()) -> kz_json:object().
 account_deleted_event_data(Doc) ->
-    ConstructedEvent = kz_json:from_list(
-        [{<<"ID">>, kz_doc:id(Doc)}
-        ,{<<"Database">>, <<"accounts">>}
-        ,{<<"Date-Created">>, kz_doc:created(Doc)}
-        ,{<<"Date-Modified">>, kz_doc:modified(Doc)}
-        ,{<<"Is-Soft-Deleted">>, kz_doc:is_deleted(Doc)}
-        ,{<<"Rev">>, kz_doc:revision(Doc)}
-        ,{<<"Type">>, kz_doc:type(Doc)}
-        ,{<<"Version">>, kz_doc:vsn(Doc)}
-        ]),
+    ConstructedEvent = kz_json:from_list([{<<"ID">>, kz_doc:id(Doc)}
+                                         ,{<<"Database">>, <<"accounts">>}
+                                         ,{<<"Date-Created">>, kz_doc:created(Doc)}
+                                         ,{<<"Date-Modified">>, kz_doc:modified(Doc)}
+                                         ,{<<"Is-Soft-Deleted">>, kz_doc:is_deleted(Doc)}
+                                         ,{<<"Rev">>, kz_doc:revision(Doc)}
+                                         ,{<<"Type">>, kz_doc:type(Doc)}
+                                         ,{<<"Version">>, kz_doc:vsn(Doc)}
+                                         ]),
     webhooks_util:sanitize_event(ConstructedEvent).
 
 
