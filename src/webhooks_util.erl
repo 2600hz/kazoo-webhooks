@@ -84,6 +84,7 @@
                              ,<<"Event-Name">>
                              ,<<"Event-Category">>
                              ,<<"Msg-ID">>
+                             ,<<"Doc">>
                              ]).
 
 -define(SENSITIVE_AMQP_FIELDS, [<<"Password">>
