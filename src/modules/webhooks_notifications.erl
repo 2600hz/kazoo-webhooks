@@ -21,6 +21,7 @@
 -include("webhooks.hrl").
 
 -define(ID, kz_term:to_binary(?MODULE)).
+-define(ACCOUNT_DELETED, <<"account_deleted">>).
 -define(HOOK_NAME, <<"notifications">>).
 -define(NAME, <<"Notifications Webhook">>).
 -define(DESC, <<"Fire a webhook when a notification event is triggered in Kazoo">>).
@@ -119,6 +120,21 @@ handle_account_notification(Notification, <<"webhook">>) ->
     Hook = webhooks_util:from_json(kz_json:get_ne_json_value(<<"Hook">>, Notification, kz_json:new())),
     Data = kz_json:normalize(kz_json:get_ne_json_value(<<"Data">>, Notification, kz_json:new())),
     webhooks_util:fire_hooks(Data, Data, [Hook]);
+handle_account_notification(Notification, ?ACCOUNT_DELETED=EventName) ->
+    AccountId = kapi_notifications:account_id(Notification),
+    lager:info("searching for hook ~s(~s) for account ~s", [EventName, ?HOOK_NAME, AccountId]),
+    case webhooks_util:find_webhooks(?HOOK_NAME, AccountId) of
+        [] ->
+            ParentId = kz_json:get_ne_binary_value(<<"Parent-ID">>, Notification),
+            lager:info("cannot get hooks from deleted Account, searching in parent ~s", [ParentId]),
+            handle_account_notification(Notification, EventName, AccountId
+                                       ,webhooks_util:find_webhooks(?HOOK_NAME, ParentId)
+                                       );
+        Hooks ->
+            handle_account_notification(Notification, EventName, AccountId
+                                       ,Hooks
+                                       )
+    end;
 handle_account_notification(Notification, EventName) ->
     AccountId = kapi_notifications:account_id(Notification),
     lager:info("searching for hook ~s(~s) for account ~s", [EventName, ?HOOK_NAME, AccountId]),

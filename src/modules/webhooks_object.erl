@@ -16,6 +16,7 @@
         ,bindings_and_responders/0
         ,account_bindings/1
         ,handle_event/2
+        ,handle_account_notif/2
         ,doc_keys/1
         ]).
 
@@ -85,10 +86,19 @@ init() ->
 bindings_and_responders() ->
     {bindings(), responders()}.
 
+-spec bindings() -> gen_listener:bindings().
+bindings() ->
+    [{'conf', [{'restrict_to', ['doc_updates']}]}
+    ,{'notifications', [{'restrict_to', ['account_deleted']}]}
+    ].
+
 -spec responders() -> listener_utils:responder_start_params().
 responders() ->
     [{{?MODULE, 'handle_event'}
      ,[{<<"configuration">>, <<"*">>}]
+     }
+    ,{{?MODULE, 'handle_account_notif'}
+     ,[{<<"notification">>, <<"account_deleted">>}]
      }
     ].
 
@@ -98,6 +108,48 @@ responders() ->
 %%------------------------------------------------------------------------------
 -spec account_bindings(kz_term:ne_binary()) -> gen_listener:bindings().
 account_bindings(_AccountId) -> [].
+
+
+-spec handle_account_notif(kapi_notifications:doc(), kz_term:proplist()) -> 'ok'.
+handle_account_notif(Notification, _Props) ->
+    EventName = kz_api:event_name(Notification),
+    EventDefinition = kapi_notifications:api_definition(EventName),
+    Validate = kapi_definition:validate_fun(EventDefinition),
+    'true' = Validate(Notification),
+
+    AccountId = kapi_notifications:account_id(Notification),
+    lager:info("hijacked ~s(notification) searching for hook ~s for account ~s", [EventName, ?HOOK_NAME, AccountId]),
+    case webhooks_util:find_webhooks(?HOOK_NAME, AccountId) of
+        [] ->
+            ParentId = kz_json:get_ne_binary_value(<<"Parent-ID">>, Notification),
+            lager:info("cannot get hooks from deleted Account, searching in parent ~s", [ParentId]),
+            handle_account_notif(Notification, AccountId
+                                ,webhooks_util:find_webhooks(?HOOK_NAME, ParentId)
+                                );
+        Hooks ->
+            handle_account_notif(Notification, AccountId
+                                ,Hooks
+                                )
+    end.
+
+
+-spec handle_account_notif(kapi_notifications:doc(), kz_term:ne_binary(), webhooks()) -> 'ok'.
+handle_account_notif(_Notification, _AccountId, []) ->
+    lager:debug("hijacked ~s no hooks to handle ~s(~s) for ~s"
+               ,[kz_api:event_name(_Notification), ?HOOK_NAME, ?DOC_DELETED, _AccountId]
+               );
+handle_account_notif(Notification, _AccountId, Hooks) ->
+    EventJobj = format_account_deleted(Notification),
+    Action = <<"doc_deleted">>,
+    Type = <<"account">>,
+    NotifName =  kz_api:event_name(Notification),
+
+    lager:debug("event for action ~s type ~s, hijacked from notification ~s", [Action, Type, NotifName]),
+    Filtered = [Hook || Hook <- Hooks, match_action_type(Hook, Action, Type)],
+    webhooks_util:fire_hooks(EventJobj, Filtered).
+
+
+
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -116,6 +168,14 @@ handle_event(DocChange, _Props) ->
             'true' = kapi_conf:doc_update_v(DocChange)
     end,
 
+    %% Ignore account doc deleted objects, hijack notifs. see KWEB-14
+    case is_account_terminus(DocChange) of
+        'true' -> ok;
+        _ -> handle_change(DocChange)
+    end.
+
+-spec handle_change(kapi_conf:doc()) -> 'ok'.
+handle_change(DocChange) ->
     case find_account_id(DocChange) of
         'undefined' -> 'ok';
         AccountId ->
@@ -179,14 +239,60 @@ match_action_type(_DataAction, _EventAction, _DataType, _EventType) ->
 %%% Internal functions
 %%%=============================================================================
 
-
 %%------------------------------------------------------------------------------
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec bindings() -> gen_listener:bindings().
-bindings() ->
-    [{'conf', [{'restrict_to', ['doc_updates']}]}].
+-spec is_account_terminus(kapi_conf:doc()) -> boolean().
+is_account_terminus(DocChange) ->
+    case {kz_api:event_name(DocChange), kapi_conf:get_type(DocChange)} of
+        {<<"doc_deleted">>, <<"account">>} -> 'true';
+        {_,_} -> 'false'
+    end.
+
+
+-spec format_account_deleted(kapi_notification:doc()) -> kz_json:object().
+format_account_deleted(Notification) ->
+    Doc = account_deleted_doc(Notification),
+    Data = account_deleted_event_data(Doc),
+    Data1 = kz_json:set_value(<<"doc">>, kz_doc:public_fields(Doc), Data),
+    Data2 = kz_json:set_value(<<"metadata">>, account_deleted_metadata(Doc), Data1),
+    Msg =   [{<<"action">>, <<"event">>}
+            ,{<<"name">>, ?DOC_DELETED}
+            ,{<<"data">>, Data2}
+            ],
+    kz_json:from_list(Msg).
+
+-spec account_deleted_doc(kapi_notifications:doc()) -> kz_doc:doc().
+account_deleted_doc(Notification) ->
+    EventDoc = kz_json:get_ne_json_value(<<"Doc">>, Notification),
+    case kzd_accounts:fetch(kapi_notifications:account_id(Notification), 'accounts') of
+        {'error', Error} ->
+            lager:debug("doc from hijacked notification event failed to open with error ~p, using incomplete doc", [Error]),
+            kz_doc:set_deleted(EventDoc);
+        {'ok', FetchedDoc} ->
+            kz_json:merge(EventDoc, FetchedDoc)
+    end.
+
+-spec account_deleted_metadata(kz_doc:doc()) -> kz_json:object().
+account_deleted_metadata(Doc) ->
+    Props = maybe_add_extra_metadata(Doc, ?DOC_DELETED),
+    kz_json:set_values(Props, kz_doc:read_only(Doc)).
+
+-spec account_deleted_event_data(kz_doc:doc()) -> kz_json:object().
+account_deleted_event_data(Doc) ->
+    ConstructedEvent = kz_json:from_list([{<<"ID">>, kz_doc:id(Doc)}
+                                         ,{<<"Database">>, <<"accounts">>}
+                                         ,{<<"Date-Created">>, kz_doc:created(Doc)}
+                                         ,{<<"Date-Modified">>, kz_doc:modified(Doc)}
+                                         ,{<<"Is-Soft-Deleted">>, kz_doc:is_deleted(Doc)}
+                                         ,{<<"Rev">>, kz_doc:revision(Doc)}
+                                         ,{<<"Type">>, kz_doc:type(Doc)}
+                                         ,{<<"Version">>, kz_doc:vsn(Doc)}
+                                         ]),
+    webhooks_util:sanitize_event(ConstructedEvent).
+
+
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -286,26 +392,26 @@ include_full_doc(Event, Type) ->
 
 -spec get_doc_metadata(kapi_conf:doc(), kz_doc:doc()) -> kz_doc:doc().
 get_doc_metadata(Event, Doc) ->
-    Props = maybe_add_extra_metadata(Event, Doc, kapi_conf:get_type(Event)),
+    Props = maybe_add_extra_metadata(Doc, kapi_conf:get_type(Event)),
     kz_json:set_values(Props, kz_doc:read_only(Doc)).
 
--spec maybe_add_extra_metadata(kapi_conf:doc(), kz_doc:doc(), kz_term:ne_binary()) -> kz_json:json_proplist().
-maybe_add_extra_metadata(Event, AccountDoc, <<"account">>) ->
+-spec maybe_add_extra_metadata(kz_doc:doc(), kz_term:ne_binary()) -> kz_json:json_proplist().
+maybe_add_extra_metadata(AccountDoc, <<"account">>) ->
     [{<<"wnm_allow_additions">>, kzd_accounts:allow_number_additions(AccountDoc)}
     ,{<<"enabled">>, kzd_accounts:is_enabled(AccountDoc)}
     ,{<<"is_reseller">>, kz_services_reseller:is_reseller(kzd_accounts:id(AccountDoc))}
     ,{<<"reseller_id">>, kz_services_reseller:get_id(kzd_accounts:id(AccountDoc))}
-    ,{<<"billing_mode">>, get_billing_mode(kapi_conf:get_account_id(Event), AccountDoc)}
+    ,{<<"billing_mode">>, get_billing_mode(kzd_accounts:id(AccountDoc), AccountDoc)}
     ,{<<"trial_time_left">>, kzd_accounts:trial_expiration(AccountDoc)}
     ,{<<"notification_preference">>, kzd_accounts:notification_preference(AccountDoc)}
     ];
-maybe_add_extra_metadata(_Event, FaxBoxDoc, <<"faxbox">>) ->
+maybe_add_extra_metadata(FaxBoxDoc, <<"faxbox">>) ->
     maybe_custom_smtp_address(FaxBoxDoc) ++ maybe_smtp_email_address(FaxBoxDoc);
-maybe_add_extra_metadata(_Event, UserDoc, <<"user">>) ->
+maybe_add_extra_metadata(UserDoc, <<"user">>) ->
     [{<<"password_expiration_timestamp">>, kzd_users:password_expiration_timestamp(UserDoc)}
     ,{<<"is_password_expired">>, kzd_users:is_password_expired(UserDoc)}
     ];
-maybe_add_extra_metadata(_Event, _Doc, _DocType) ->
+maybe_add_extra_metadata(_Doc, _DocType) ->
     [].
 
 -spec get_billing_mode(kz_term:api_binary(), kzd_accounts:doc()) -> kz_term:ne_binary().
