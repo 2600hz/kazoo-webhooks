@@ -121,6 +121,7 @@ to_json(#webhook{}=Hook) ->
       ,{<<"include_internal_legs">>, Hook#webhook.include_loopback}
       ,{<<"version">>, kz_term:to_binary(Hook#webhook.version)}
       ,{<<"custom_data">>, Hook#webhook.custom_data}
+      ,{<<"custom_request_headers">>, Hook#webhook.custom_request_headers}
       ,{<<"modifiers">>, Hook#webhook.modifiers}
       ,{<<"security">>, Hook#webhook.security}
       ]).
@@ -244,6 +245,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
                 ,retries = Retries
                 ,hook_event = _HookEvent
                 ,hook_id = _HookId
+                ,custom_request_headers = CustomRequestHeaders
                 } = Hook
        ,EventId
        ,JObj
@@ -254,7 +256,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
                            ,kz_term:to_binary([$? | kz_http_util:json_to_querystring(JObj)])
                            ])
            ),
-    Headers = ?HTTP_REQ_HEADERS(Hook),
+    Headers = ?HTTP_REQ_HEADERS(Hook) ++ custom_request_headers(CustomRequestHeaders),
     Debug = debug_req(Hook, EventId, URI, Headers, <<>>),
     Fired = kz_http:get(Url, Headers, ?HTTP_OPTS),
     handle_resp(Hook, EventId, JObj, Debug, Fired);
@@ -264,6 +266,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
                 ,hook_event = _HookEvent
                 ,hook_id = _HookId
                 ,format = 'form-data'
+                ,custom_request_headers = CustomRequestHeaders
                 } = Hook
        ,EventId
        ,JObj
@@ -275,7 +278,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
     Body = kz_http_util:json_to_querystring(JObj),
     Headers = [{"Content-Type", "application/x-www-form-urlencoded"}
               | ?HTTP_REQ_HEADERS(Hook)
-              ],
+              ] ++ custom_request_headers(CustomRequestHeaders),
     Debug = debug_req(Hook, EventId, URI, Headers, Body),
     Fired = kz_http:req(Verb, URI, Headers, Body, ?HTTP_OPTS),
 
@@ -286,6 +289,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
                 ,hook_event = _HookEvent
                 ,hook_id = _HookId
                 ,format = 'json'
+                ,custom_request_headers = CustomRequestHeaders
                 } = Hook
        ,EventId
        ,JObj
@@ -298,7 +302,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
     Body = kz_json:encode(JObj, ['pretty']),
     Headers = [{"Content-Type", "application/json"}
               | ?HTTP_REQ_HEADERS(Hook)
-              ],
+              ] ++ custom_request_headers(CustomRequestHeaders),
     Debug = debug_req(Hook, EventId, URI, Headers, Body),
     Fired = kz_http:req(Verb, URI, Headers, Body, ?HTTP_OPTS),
 
@@ -416,6 +420,7 @@ debug_req(#webhook{hook_id=HookId
                   ,hook_event = HookEvent
                   ,http_verb = Method
                   ,custom_data = CustomData
+                  ,custom_request_headers = CustomRequestHeaders
                   }, EventId, URI, ReqHeaders, ReqBody) ->
     Headers = kz_json:from_list(
                 [{fix_value(K), fix_value(V)}
@@ -424,6 +429,7 @@ debug_req(#webhook{hook_id=HookId
     [{<<"hook_id">>, HookId}
     ,{<<"hook_event">>, HookEvent}
     ,{<<"custom_data">>, CustomData}
+    ,{<<"custom_request_headers">>, CustomRequestHeaders}
     ,{<<"event_id">>, EventId}
     ,{<<"uri">>, kz_term:to_binary(URI)}
     ,{<<"method">>, kz_term:to_binary(Method)}
@@ -686,6 +692,7 @@ jobj_to_rec(Webhook) ->
             ,include_loopback = kzd_webhooks:include_internal_legs(Webhook)
             ,version = kz_term:to_atom(kzd_webhooks:version(Webhook))
             ,custom_data = kzd_webhooks:custom_data(Webhook)
+            ,custom_request_headers = kzd_webhooks:custom_request_headers(Webhook)
             ,modifiers = kzd_webhooks:modifiers(Webhook)
             ,format = kzd_webhooks:format(Webhook)
             ,security = kzd_webhooks:security_settings(Webhook)
@@ -915,3 +922,7 @@ sanitize_event(Event) ->
         kz_json:delete_keys(?SENSITIVE_EVENT_FIELDS, Event)
        )
      ).
+
+-spec custom_request_headers(kz_term:api_object()) -> kz_term:proplist().
+custom_request_headers('undefined') -> [];
+custom_request_headers(Headers) -> kz_json:to_proplist(Headers).
