@@ -299,7 +299,7 @@ do_fire(#webhook{uri = ?NE_BINARY = URI
                ,[_HookEvent, _HookId, EventId, Verb, Retries, URI]
                ),
 
-    Body = kz_json:encode(JObj, ['pretty']),
+    Body = kz_json:encode(JObj, ['canonical']),
     Headers = [{"Content-Type", "application/json"}
               | ?HTTP_REQ_HEADERS(Hook)
               ] ++ custom_request_headers(CustomRequestHeaders),
