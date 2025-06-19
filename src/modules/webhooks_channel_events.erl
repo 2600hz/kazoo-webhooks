@@ -224,6 +224,7 @@ base_hook_event(CallEvent, AccountId, Acc) ->
       ,{<<"caller_id_number">>, kz_call_event:caller_id_number(CallEvent)}
       ,{<<"custom_channel_vars">>, non_reserved_ccvs(CallEvent)}
       ,{<<"custom_application_vars">>, cavs(CallEvent)}
+      ,{<<"custom_sip_headers">>, kz_call_event:custom_sip_headers(CallEvent)}
       ,{<<"emergency_resource_used">>, kz_term:is_true(ccv(CallEvent, <<"Emergency-Resource">>))}
       ,{<<"from">>, kz_json:get_value(<<"From">>, CallEvent)}
       ,{<<"inception">>, kz_json:get_value(<<"Inception">>, CallEvent)}
