@@ -27,6 +27,7 @@ Here is a sample of what you can expect to receive when a channel event is trigg
     "caller_id_number": "+15556783945",
     "custom_application_vars": {},
     "custom_channel_vars": {},
+    "custom_sip_headers": {},
     "emergency_resource_used": false,
     "from": "+15556783945@matrix.test.com",
     "inception": "+15556783945@matrix.test.com",
