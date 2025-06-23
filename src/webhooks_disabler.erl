@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2015-2023, 2600Hz
+%%% @copyright (C) 2015-2025, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -176,7 +176,7 @@ disable_hook(AccountId, HookId) ->
         {'ok', _Updated} ->
             filter_cache(AccountId, HookId),
             send_notification(AccountId, HookId),
-            lager:debug("auto-disabled and saved hook ~s/~s", [AccountId, HookId]);
+            lager:info("auto-disabled and saved hook ~s/~s", [AccountId, HookId]);
         {'error', _E} ->
             lager:info("failed to auto-disable hook ~s/~s: ~p", [AccountId, HookId, _E])
     end.

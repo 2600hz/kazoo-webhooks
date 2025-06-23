@@ -332,6 +332,8 @@ handle_resp(#webhook{hook_event = _HookEvent
     successful_hook(Hook, Debug, Resp);
 handle_resp(#webhook{hook_event = _HookEvent
                     ,hook_id = _HookId
+                    ,uri = _URI
+                    ,account_id = _AccountId
                     } = Hook
            ,_EventId
            ,_JObj
@@ -339,9 +341,9 @@ handle_resp(#webhook{hook_event = _HookEvent
            ,{'ok', RespCode, _, _} = Resp
            ) ->
     _ = failed_hook(Hook, Debug, Resp),
-    lager:debug("non-200 response code: ~p on account ~s for event ~s(~s) with interaction id ~s"
-               ,[RespCode, Hook#webhook.account_id, _HookEvent, _HookId, _EventId]
-               );
+    lager:info("non-200 response code from ~s: ~p on account ~s for event ~s(~s) with interaction id ~s"
+              ,[_URI, RespCode, _AccountId, _HookEvent, _HookId, _EventId]
+              );
 handle_resp(#webhook{hook_event = _HookEvent
                     ,hook_id = _HookId
                     } = Hook
@@ -350,7 +352,9 @@ handle_resp(#webhook{hook_event = _HookEvent
            ,Debug
            ,{'error', _E} = Resp
            ) ->
-    lager:debug("failed to fire hook event ~s(~s) interaction id: ~p error: ~p", [_HookEvent, _HookId, EventId, _E]),
+    lager:warning("failed to fire hook event ~s(~s) interaction id: ~p error: ~p"
+                 ,[_HookEvent, _HookId, EventId, _E]
+                 ),
     _ = failed_hook(Hook, Debug, Resp),
     retry_hook(Hook, EventId, JObj).
 
@@ -363,7 +367,7 @@ retry_hook(#webhook{uri = _URI
           ,_EventId
           ,_JObj
           ) ->
-    lager:debug("retries exhausted for event ~s(~s) with interaction id ~s for uri (~s)", [_HookEvent, _HookId, _EventId, _URI]);
+    lager:info("retries exhausted for event ~s(~s) with interaction id ~s for uri (~s)", [_HookEvent, _HookId, _EventId, _URI]);
 retry_hook(#webhook{retries = Retries} = Hook, EventId, JObj) ->
     timer:sleep(2000),
     do_fire(Hook#webhook{retries = Retries - 1}, EventId, JObj).
