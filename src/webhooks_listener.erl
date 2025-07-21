@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2023, 2600Hz
+%%% @copyright (C) 2013-2025, 2600Hz
 %%% @doc
 %%% @author James Aimonetti
 %%%
@@ -15,7 +15,6 @@
 
 -export([start_link/0
         ,handle_config/2
-        ,handle_cache_change/1
         ]).
 -export([init/1
         ,handle_call/3
@@ -36,7 +35,7 @@
 
 -define(BINDINGS, [{'conf', [{'action', <<"*">>}
                             ,{'db', ?KZ_WEBHOOKS_DB}
-                            ,{'type', <<"webhook">>}
+                            ,{'type', kzd_webhooks:type()}
                             ,{'id', <<"*">>}
                             ,'federate'
                             ]}
@@ -88,7 +87,7 @@ handle_config(JObj, Srv, ?DOC_EDITED) ->
     case kapi_conf:get_id(JObj) of
         'undefined' -> find_and_update_hook(JObj, Srv);
         HookId ->
-            {'ok', Hook} = kz_datamgr:open_cache_doc(?KZ_WEBHOOKS_DB, HookId),
+            {'ok', Hook} = kz_datamgr:open_doc(?KZ_WEBHOOKS_DB, HookId),
             handle_edited_hook(Srv, Hook),
             webhooks_disabler:flush_failures(kapi_conf:get_account_id(JObj), HookId)
     end;
@@ -115,16 +114,6 @@ handle_edited_hook(Srv, Hook) ->
             gen_listener:cast(Srv, {'update_hook', webhooks_util:jobj_to_rec(Hook)});
         'false' ->
             gen_listener:cast(Srv, {'remove_hook', webhooks_util:jobj_to_rec(Hook)})
-    end.
-
--spec handle_cache_change([{kz_term:ne_binary(), kz_term:ne_binary()}]) -> 'ok'.
-handle_cache_change([{DbName, DocId}]) ->
-    case kz_datamgr:open_cache_doc(DbName, DocId) of
-        {'ok', JObj} ->
-            lager:info("cache entry erased, fetched new hook config ~s: ~s", [kz_doc:id(JObj), kz_doc:revision(JObj)]),
-            handle_edited_hook(?SERVER, JObj);
-        {'error', Error}->
-            lager:debug("failed to open doc ~s in database ~s : ~p", [DocId, DbName, Error])
     end.
 
 -spec maybe_remove_account_hooks(pid(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
@@ -158,7 +147,7 @@ find_and_remove_hook(JObj, Srv) ->
           {'ok', kzd_webhooks:doc()} |
           {'error', any()}.
 find_hook(JObj) ->
-    kz_datamgr:open_cache_doc(?KZ_WEBHOOKS_DB, kapi_conf:get_id(JObj)).
+    kz_datamgr:open_doc(?KZ_WEBHOOKS_DB, kapi_conf:get_id(JObj)).
 
 %%%=============================================================================
 %%% gen_server callbacks
@@ -171,11 +160,6 @@ find_hook(JObj) ->
 -spec init([]) -> {'ok', state()}.
 init([]) ->
     kz_log:put_callid(?MODULE),
-    _ = kzs_cache:bind_for_changes(<<"*">>
-                                  ,?KZ_WEBHOOKS_DB
-                                  ,kzd_webhooks:type()
-                                  ,fun ?MODULE:handle_cache_change/1
-                                  ),
     {'ok', #state{}}.
 
 %%------------------------------------------------------------------------------
@@ -213,6 +197,8 @@ handle_cast({'gen_listener', {'created_queue', _Q}}, State) ->
     {'noreply', State};
 handle_cast({'gen_listener', {'is_consuming', _IsConsuming}}, State) ->
     lager:debug("starting to consume: ~s", [_IsConsuming]),
+    {'noreply', State};
+handle_cast({'gen_listener', {'federators_consuming', _AreFederatorsConsuming}}, State) ->
     {'noreply', State};
 handle_cast(_Msg, State) ->
     lager:debug("unhandled cast: ~p", [_Msg]),
