@@ -103,12 +103,16 @@ bindings() ->
 %%------------------------------------------------------------------------------
 -spec format_event(kz_json:object(), kz_term:ne_binary()) -> kz_json:object().
 format_event(Payload, AccountId) ->
+    NumberRegex = kapps_config:get_ne_binary(<<"webhooks">>, <<"mms_number_format_regex">>),
+    From = webhooks_util:format_number(kz_im:from(Payload), NumberRegex),
+    To = webhooks_util:format_number(kz_im:to(Payload), NumberRegex),
+
     kz_json:from_list(
       [{<<"id">>, kz_im:message_id(Payload)}
       ,{<<"account_id">>, AccountId}
       ,{<<"type">>, kz_im:type(Payload)}
-      ,{<<"from">>, kz_im:from(Payload)}
-      ,{<<"to">>, kz_im:to(Payload)}
+      ,{<<"from">>, From}
+      ,{<<"to">>, To}
       ,{<<"body">>, kz_im:body(Payload)}
       ,{<<"origin">>, kz_im:route_type(Payload)}
       ,{<<"charges">>, kz_im:charges(Payload)}

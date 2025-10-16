@@ -35,6 +35,8 @@
         ,reenable/2
         ,init_metadata/2
         ,available_events/0
+
+        ,format_number/2
         ]).
 
 -ifdef(TEST).
@@ -393,6 +395,22 @@ failed_hook(#webhook{hook_id = HookId
     note_failed_attempt(AccountId, HookId),
     DebugJObj = debug_resp(Resp, Debug, Retries),
     save_attempt(AccountId, DebugJObj).
+
+-spec format_number(kz_term:api_ne_binary() | kz_term:ne_binaries(), kz_term:api_ne_binary()) ->
+          kz_term:api_ne_binary() | kz_term:ne_binaries().
+format_number(Number, 'undefined') -> Number;
+format_number('undefined', _Regex) -> 'undefined';
+format_number(Numbers, Regex) when is_list(Numbers) ->
+    [format_single_number(Number, Regex) || Number <- Numbers];
+format_number(Number, Regex) when is_binary(Number) ->
+    format_single_number(Number, Regex).
+
+-spec format_single_number(kz_term:ne_binary(), kz_term:ne_binary()) -> kz_term:ne_binary().
+format_single_number(Number, Regex) ->
+    case re:run(Number, Regex, [{'capture', 'all_but_first', 'binary'}]) of
+        {'match', [Captured]} -> Captured;
+        'nomatch' -> Number
+    end.
 
 %%%=============================================================================
 %%% Internal functions
