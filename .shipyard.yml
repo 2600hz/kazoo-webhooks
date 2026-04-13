@@ -1,7 +1,7 @@
 name: kazoo-application-webhooks
 custom_files: null
 exposure: private
-base_branch: origin/5.4
+base_branch: origin/master
 base_core: kazoo-core
 template: kazoo-application.spec.tmpl
 package:
@@ -41,6 +41,6 @@ metapackage:
   -
     name: meta-kazoo-applications
     type: required
-    branch: '5.4'
+    branch: 'master'
     package: kazoo-application-webhooks
 dependencies: null
